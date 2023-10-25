@@ -1,0 +1,1289 @@
+{
+    "kind": "drive#commentList",
+    "comments": [
+      {
+        "id": "AAAAo83rDdQ",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-10T08:47:36.650Z",
+        "modifiedTime": "2023-02-10T08:47:36.650Z",
+        "resolved": false,
+        "anchor": "kix.m8m11h3qogp4",
+        "replies": [],
+        "author": {
+          "displayName": "Michael Haggerty",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a-/AD5-WClNNQ57LgPvDdKRujUXd0eHXCvp1kDL5ANWI5DZuA=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "A PR being in the &quot;closed&quot; state makes it sound like the commits on the PR were never merged. I can understand that we don&#39;t want to mark unmergeable PRs &quot;merged&quot;, but maybe we could still add a comment to the closed PR&#39;s timeline saying something like &quot;the commits that appear on this PR were merged to `main` as part of another PR (#1234)&quot; (or, in the general case, &quot;…as part of other PRs (#1234, #5678, #9012)&quot;). It would help users understand why they find those commits in `main` despite the PR that they are looking at having been closed and never having been approved.\u003cbr\u003eIn fact, the same annotation might be useful if the commits that were on a PR that was \u003ci\u003ealready\u003c/i\u003e closed get merged via a different PR.",
+        "content": "A PR being in the \"closed\" state makes it sound like the commits on the PR were never merged. I can understand that we don't want to mark unmergeable PRs \"merged\", but maybe we could still add a comment to the closed PR's timeline saying something like \"the commits that appear on this PR were merged to `main` as part of another PR (#1234)\" (or, in the general case, \"…as part of other PRs (#1234, #5678, #9012)\"). It would help users understand why they find those commits in `main` despite the PR that they are looking at having been closed and never having been approved.\nIn fact, the same annotation might be useful if the commits that were on a PR that was _already_ closed get merged via a different PR.",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "All unmergeable PRs will be moved to the “closed” state."
+        }
+      },
+      {
+        "id": "AAAApoQo6Xo",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-08T21:35:30.609Z",
+        "modifiedTime": "2023-02-09T20:48:06.153Z",
+        "resolved": false,
+        "anchor": "kix.phi6efu7wfch",
+        "replies": [
+          {
+            "id": "AAAAp_hAbnY",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-09T20:48:06.153Z",
+            "modifiedTime": "2023-02-09T20:48:06.153Z",
+            "author": {
+              "displayName": "Ed Glas",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp7qiiTmvm0CNYYfOysZoLk1uIhtsX1AQqFfnJzx=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "This proposal makes a ton of sense to me, and is what I expect as a customer.",
+            "content": "This proposal makes a ton of sense to me, and is what I expect as a customer."
+          }
+        ],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "Hi team! I think this one is ready for an official ADR. I&#39;ll open it in the morning. \u003cbr\u003eThank you all for your comments and input so far!",
+        "content": "Hi team! I think this one is ready for an official ADR. I'll open it in the morning. \nThank you all for your comments and input so far!",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Pull Requests are Independent"
+        }
+      },
+      {
+        "id": "AAAAppEWWxQ",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-07T20:35:56.845Z",
+        "modifiedTime": "2023-02-07T20:35:56.845Z",
+        "resolved": false,
+        "anchor": "kix.8as042lsvgvb",
+        "replies": [],
+        "author": {
+          "displayName": "Matt Cooper",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a-/AD5-WClfwUtKM1G93yUK8FrJSJMZCHnnk4N9NK4x7tu60Q=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "This feels like the lynchpin of why the existing protection doesn&#39;t matter as a security boundary. So, if it&#39;s stressing other parts of the system, it feels safe to drop.",
+        "content": "This feels like the lynchpin of why the existing protection doesn't matter as a security boundary. So, if it's stressing other parts of the system, it feels safe to drop.",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Breaking this association is also trivial.\nAny change to any topic branch (including clicking the “update branch” button) will cause it to point to a different sha and thus extract itself from its previous network."
+        }
+      },
+      {
+        "id": "AAAAp_3zrxk",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-07T13:10:38.051Z",
+        "modifiedTime": "2023-02-09T18:55:59.627Z",
+        "resolved": true,
+        "anchor": "kix.8wqvrvjl6tot",
+        "replies": [
+          {
+            "id": "AAAAp_jN9pA",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T15:14:06.756Z",
+            "modifiedTime": "2023-02-07T15:14:06.756Z",
+            "author": {
+              "displayName": "Daryl Cantrell",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCnZznu-yJBR098IzdiakvMPoJSigTIeyk_NeKxJ=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "The issue is that when they first create their topic branch, they&#39;ll be pointing at the current HEAD of the main branch. \u003cbr\u003e\u003cbr\u003eThe second developer in this scenario would be able to create a topic branch, but unable to open a new PR for it. This would happen essentially at random times, which isn&#39;t a great user experience.",
+            "content": "The issue is that when they first create their topic branch, they'll be pointing at the current HEAD of the main branch. \n\nThe second developer in this scenario would be able to create a topic branch, but unable to open a new PR for it. This would happen essentially at random times, which isn't a great user experience."
+          },
+          {
+            "id": "AAAApoQo6Ds",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T20:19:47.822Z",
+            "modifiedTime": "2023-02-08T20:19:47.822Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "we have since discovered that this flow is blocked by the PR ux for the trivial, no new commit cases. You must have at least one commit different from the base branch to open a PR. \u003cbr\u003eHowever, this commit can still be identical to another developers commit on another branch, see the example setup at the top of this doc.",
+            "content": "we have since discovered that this flow is blocked by the PR ux for the trivial, no new commit cases. You must have at least one commit different from the base branch to open a PR. \nHowever, this commit can still be identical to another developers commit on another branch, see the example setup at the top of this doc."
+          },
+          {
+            "id": "AAAAp_hAbbM",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-09T18:55:59.627Z",
+            "modifiedTime": "2023-02-09T18:55:59.627Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Ed Glas",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp7qiiTmvm0CNYYfOysZoLk1uIhtsX1AQqFfnJzx=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "Only if they are merging the same commit in the topic branch, right? They would each be pushing different commits into their topic branch.",
+        "content": "Only if they are merging the same commit in the topic branch, right? They would each be pushing different commits into their topic branch.",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "If two developers do the same thing, this would block one of them unnecessarily."
+        }
+      },
+      {
+        "id": "AAAAp_3zrxg",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-07T13:08:57.139Z",
+        "modifiedTime": "2023-02-09T18:55:51.874Z",
+        "resolved": true,
+        "anchor": "kix.qmqqyococna9",
+        "replies": [
+          {
+            "id": "AAAAppEWWuA",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T19:52:30.424Z",
+            "modifiedTime": "2023-02-07T19:52:48.447Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "no, we need to pick one of b,c,d. \u003cbr\u003eOur previous comment thread has gotten lost somewhere.",
+            "content": "no, we need to pick one of b,c,d. \nOur previous comment thread has gotten lost somewhere."
+          },
+          {
+            "id": "AAAApoQo6DM",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T20:18:11.897Z",
+            "modifiedTime": "2023-02-08T20:18:11.897Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "I think based on @\u003ca href=\"mailto:wincent@github.com\" data-rawHref=\"mailto:wincent@github.com\" target=\"_blank\"\u003ewincent@github.com\u003c/a\u003e and @\u003ca href=\"mailto:darylcantrell@github.com\" data-rawHref=\"mailto:darylcantrell@github.com\" target=\"_blank\"\u003edarylcantrell@github.com\u003c/a\u003e explanations below, we should go with &quot;closed&quot; / &quot;abandoned&quot; for unmanageable PRs. \u003cbr\u003eAfter the mergeable ones complete, you would be blocked from even creating the unmergeable ones.",
+            "content": "I think based on @wincent@github.com and @darylcantrell@github.com explanations below, we should go with \"closed\" / \"abandoned\" for unmanageable PRs. \nAfter the mergeable ones complete, you would be blocked from even creating the unmergeable ones."
+          },
+          {
+            "id": "AAAApoQo6W0",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T21:28:19.922Z",
+            "modifiedTime": "2023-02-08T21:28:19.922Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "@\u003ca href=\"mailto:darylcantrell@github.com\" data-rawHref=\"mailto:darylcantrell@github.com\" target=\"_blank\"\u003edarylcantrell@github.com\u003c/a\u003e how do we compute which PR to link from the commit history?",
+            "content": "@darylcantrell@github.com how do we compute which PR to link from the commit history?"
+          },
+          {
+            "id": "AAAApoQo6X8",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T21:38:42.615Z",
+            "modifiedTime": "2023-02-08T21:38:42.615Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "these pull requests are now kind of &quot;zombie&quot; pull requests -- they have no content to offer and were not mergeable. &quot;merged&quot; prs will now be interpreted to mean &quot;were mergeable at the time.&quot;",
+            "content": "these pull requests are now kind of \"zombie\" pull requests -- they have no content to offer and were not mergeable. \"merged\" prs will now be interpreted to mean \"were mergeable at the time.\""
+          },
+          {
+            "id": "AAAAp_hAbbE",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-09T18:55:51.874Z",
+            "modifiedTime": "2023-02-09T18:55:51.874Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Ed Glas",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp7qiiTmvm0CNYYfOysZoLk1uIhtsX1AQqFfnJzx=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "I&#39;m confused by these statements as they seem contradictory. Are we saying that they move to these states sequentially?",
+        "content": "I'm confused by these statements as they seem contradictory. Are we saying that they move to these states sequentially?",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "All unmergeable PRs will remain in their current state. \nAll unmergeable PRs will be moved to the “closed” state.\nAll unmergeable PRs will be moved to the “merged” state."
+        }
+      },
+      {
+        "id": "AAAApf6rskw",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-03T17:18:18.831Z",
+        "modifiedTime": "2023-02-09T18:55:47.403Z",
+        "resolved": true,
+        "anchor": "kix.zad5w16wfrml",
+        "replies": [
+          {
+            "id": "AAAAp_hAba8",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-09T18:55:47.403Z",
+            "modifiedTime": "2023-02-09T18:55:47.403Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "I&#39;m guessing the PR sync job is what handles this state change too.",
+        "content": "I'm guessing the PR sync job is what handles this state change too.",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Command line merges will mark all mergeable PRs as “merged”"
+        }
+      },
+      {
+        "id": "AAAAonS19cI",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T19:15:05.152Z",
+        "modifiedTime": "2023-02-08T21:32:45.740Z",
+        "resolved": true,
+        "anchor": "kix.j2vfd55zj2sg",
+        "replies": [
+          {
+            "id": "AAAApf6rsfE",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T16:07:00.154Z",
+            "modifiedTime": "2023-02-03T16:07:00.154Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "My intuition is that is that number of customers who rely on this behavior would be roughly the same order of magnitude as those who are \u003ci\u003ecomplaining\u003c/i\u003e that clicking &quot;update branch&quot; on one PR unlinks it from other blocking reviews. \u003cbr\u003e\u003cbr\u003eTo my knowledge, we have very few instances of that that feedback being raised, but I&#39;d be interested to to know if that&#39;s a historical or common issue for the pull-requests team historically? @\u003ca href=\"mailto:ktravers@github.com\" data-rawHref=\"mailto:ktravers@github.com\" target=\"_blank\"\u003ektravers@github.com\u003c/a\u003e",
+            "content": "My intuition is that is that number of customers who rely on this behavior would be roughly the same order of magnitude as those who are _complaining_ that clicking \"update branch\" on one PR unlinks it from other blocking reviews. \n\nTo my knowledge, we have very few instances of that that feedback being raised, but I'd be interested to to know if that's a historical or common issue for the pull-requests team historically? @ktravers@github.com"
+          },
+          {
+            "id": "AAAApoQo6XQ",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T21:32:43.999Z",
+            "modifiedTime": "2023-02-08T21:32:43.999Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "@\u003ca href=\"mailto:jschnapper@github.com\" data-rawHref=\"mailto:jschnapper@github.com\" target=\"_blank\"\u003ejschnapper@github.com\u003c/a\u003e is running some numbers to estimate impact here, but we suspect it is vanishingly low.",
+            "content": "@jschnapper@github.com is running some numbers to estimate impact here, but we suspect it is vanishingly low."
+          },
+          {
+            "id": "AAAApoQo6XU",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T21:32:45.740Z",
+            "modifiedTime": "2023-02-08T21:32:45.740Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Kate Travers",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCkevES00cH5g8kAg39NxwlPwi1m5QnpnL6CZLDX=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "Curious if we have any sense of how many customers rely on the existing behavior, where PR2 would not be mergeable. \u003cbr\u003e\u003cbr\u003ePersonally, I agree with the recommended proposal here, but might be helpful to get a heads up on how many frustrated customers we might be facing after making this change. \u003cbr\u003e\u003cbr\u003eI can foresee plenty of folks being peeved that previously &quot;blocked&quot; bugs are now allowed to be merged (even though I agree, our platform shouldn&#39;t be the thing that determines which review is more &quot;valid&quot; than the other in this scenario).",
+        "content": "Curious if we have any sense of how many customers rely on the existing behavior, where PR2 would not be mergeable. \n\nPersonally, I agree with the recommended proposal here, but might be helpful to get a heads up on how many frustrated customers we might be facing after making this change. \n\nI can foresee plenty of folks being peeved that previously \"blocked\" bugs are now allowed to be merged (even though I agree, our platform shouldn't be the thing that determines which review is more \"valid\" than the other in this scenario).",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "The review provided by the senior IC is important, but the process was followed to the letter for PR2."
+        }
+      },
+      {
+        "id": "AAAAonS19Z0",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T18:54:02.292Z",
+        "modifiedTime": "2023-02-09T18:55:41.618Z",
+        "resolved": true,
+        "anchor": "kix.c3uo026ra6ga",
+        "replies": [
+          {
+            "id": "AAAAp_3zrxY",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T13:04:36.693Z",
+            "modifiedTime": "2023-02-07T13:04:36.693Z",
+            "author": {
+              "displayName": "Ed Glas",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp7qiiTmvm0CNYYfOysZoLk1uIhtsX1AQqFfnJzx=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "This model makes sense and is what I expect as a user.",
+            "content": "This model makes sense and is what I expect as a user."
+          },
+          {
+            "id": "AAAAp_3zrxc",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T13:06:15.230Z",
+            "modifiedTime": "2023-02-07T13:06:15.230Z",
+            "author": {
+              "displayName": "Ed Glas",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp7qiiTmvm0CNYYfOysZoLk1uIhtsX1AQqFfnJzx=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "Do we know the history of the current behavior? It sounds like it was done intentionally. Are we opening any security holes?",
+            "content": "Do we know the history of the current behavior? It sounds like it was done intentionally. Are we opening any security holes?"
+          },
+          {
+            "id": "AAAAp_jN9pU",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T15:31:22.196Z",
+            "modifiedTime": "2023-02-07T15:31:22.196Z",
+            "author": {
+              "displayName": "Daryl Cantrell",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCnZznu-yJBR098IzdiakvMPoJSigTIeyk_NeKxJ=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "I&#39;m guessing the current design grew out of GitHub&#39;s propensity to be commit-centric in matters where all the other git providers are PR-centric.\u003cbr\u003e\u003cbr\u003eAlso, when pushing from the command line it&#39;s a bit more work to loop through all possible pull requests and evaluate each one individually, than it is to just fetch all the approvals and count them.",
+            "content": "I'm guessing the current design grew out of GitHub's propensity to be commit-centric in matters where all the other git providers are PR-centric.\n\nAlso, when pushing from the command line it's a bit more work to loop through all possible pull requests and evaluate each one individually, than it is to just fetch all the approvals and count them."
+          },
+          {
+            "id": "AAAAp_jN9pc",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T15:34:48.939Z",
+            "modifiedTime": "2023-02-07T15:34:48.939Z",
+            "author": {
+              "displayName": "Daryl Cantrell",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCnZznu-yJBR098IzdiakvMPoJSigTIeyk_NeKxJ=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "@\u003ca href=\"mailto:jeschu1@github.com\" data-rawHref=\"mailto:jeschu1@github.com\" target=\"_blank\"\u003ejeschu1@github.com\u003c/a\u003e \u003cbr\u003e\u003cbr\u003eYes, last pusher is where this &quot;treat these 3 pull request like they&#39;re one PR&quot; falls apart.\u003cbr\u003e\u003cbr\u003eThe problem is that you push to a branch, and each PR has its own branch. We don&#39;t let you make multiple pull requests from A to B. So there&#39;s no clearly defined &quot;last pusher&quot;, there is a different answer for each pull request.",
+            "content": "@jeschu1@github.com \n\nYes, last pusher is where this \"treat these 3 pull request like they're one PR\" falls apart.\n\nThe problem is that you push to a branch, and each PR has its own branch. We don't let you make multiple pull requests from A to B. So there's no clearly defined \"last pusher\", there is a different answer for each pull request."
+          },
+          {
+            "id": "AAAAp_hAba4",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-09T18:55:41.618Z",
+            "modifiedTime": "2023-02-09T18:55:41.618Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Jessica Schumaker",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp69b03WnzsyUIB1xaZboQGJRNJMj_72i_1XTnP-=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "Worth pointing out that in the case of the Required Approval and Discussion Resolution, the PR is a clear artifact.  \u003cbr\u003e\u003cbr\u003eFor Approvals we clearly say who approved what and where. \u003cbr\u003e\u003cbr\u003eDiscussions of courses requires comments in all PRs to be resolved.\u003cbr\u003e\u003cbr\u003eLast Pusher however, does have a gap here.",
+        "content": "Worth pointing out that in the case of the Required Approval and Discussion Resolution, the PR is a clear artifact.  \n\nFor Approvals we clearly say who approved what and where. \n\nDiscussions of courses requires comments in all PRs to be resolved.\n\nLast Pusher however, does have a gap here.",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Each PR should be a clear artifact that explains why a commit was merged."
+        }
+      },
+      {
+        "id": "AAAAonS19Y0",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T18:50:24.093Z",
+        "modifiedTime": "2023-02-09T18:55:29.274Z",
+        "resolved": true,
+        "anchor": "kix.9hajluf44rux",
+        "replies": [
+          {
+            "id": "AAAApf6rskI",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T16:59:39.409Z",
+            "modifiedTime": "2023-02-03T16:59:39.409Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "It&#39;s not clear how many of those times 1) the user intended to be in that situation or 2) it impacted the process in any way or 3) the PR eventually merged based on the state. \u003cbr\u003eThat latter point we might be able to track. @\u003ca href=\"mailto:jschnapper@github.com\" data-rawHref=\"mailto:jschnapper@github.com\" target=\"_blank\"\u003ejschnapper@github.com\u003c/a\u003e what do you think?",
+            "content": "It's not clear how many of those times 1) the user intended to be in that situation or 2) it impacted the process in any way or 3) the PR eventually merged based on the state. \nThat latter point we might be able to track. @jschnapper@github.com what do you think?"
+          },
+          {
+            "id": "AAAApf6rsks",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T17:17:55.699Z",
+            "modifiedTime": "2023-02-03T17:17:55.699Z",
+            "author": {
+              "displayName": "Jessica Schumaker",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp69b03WnzsyUIB1xaZboQGJRNJMj_72i_1XTnP-=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "I think we can further break down this telemetry to determine impact.  For instance knowing how many customers, use this workflow could be insightful.\u003cbr\u003e\u003cbr\u003e@\u003ca href=\"mailto:jschnapper@github.com\" data-rawHref=\"mailto:jschnapper@github.com\" target=\"_blank\"\u003ejschnapper@github.com\u003c/a\u003e I&#39;d be happy to sync with you offline on that.  We may already have the telemetry.",
+            "content": "I think we can further break down this telemetry to determine impact.  For instance knowing how many customers, use this workflow could be insightful.\n\n@jschnapper@github.com I'd be happy to sync with you offline on that.  We may already have the telemetry."
+          },
+          {
+            "id": "AAAApf6rspE",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T18:56:41.335Z",
+            "modifiedTime": "2023-02-03T18:56:41.335Z",
+            "author": {
+              "displayName": "Jarrod Schnapper",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "👍",
+            "content": "👍"
+          },
+          {
+            "id": "AAAAp_3zrxU",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T12:58:38.475Z",
+            "modifiedTime": "2023-02-07T13:00:12.088Z",
+            "author": {
+              "displayName": "Ed Glas",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp7qiiTmvm0CNYYfOysZoLk1uIhtsX1AQqFfnJzx=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "@\u003ca href=\"mailto:jeschu1@githubazure.com\" data-rawHref=\"mailto:jeschu1@githubazure.com\" target=\"_blank\"\u003ejeschu1@githubazure.com\u003c/a\u003e I was also surprised at how many there were. Goes to show that a small percentage of a big number is still a big number. But still, for this scenario, that number is way higher than I would expect.",
+            "content": "@jeschu1@githubazure.com I was also surprised at how many there were. Goes to show that a small percentage of a big number is still a big number. But still, for this scenario, that number is way higher than I would expect."
+          },
+          {
+            "id": "AAAApnqjo4M",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-09T02:13:49.953Z",
+            "modifiedTime": "2023-02-09T02:15:25.721Z",
+            "author": {
+              "displayName": "Jarrod Schnapper",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "after pulling some additional data (\u003ca href=\"https://www.google.com/url?q=https://app.datadoghq.com/dashboard/ui8-x9n-2rj/equivalent-pull-requests?from_ts%3D1675905250174%26to_ts%3D1675908850174%26live%3Dtrue&amp;sa=D&amp;source=docs&amp;ust=1676045439789255&amp;usg=AOvVaw2cLtwU0rukfjCT2MrNevF8\" data-rawHref=\"https://app.datadoghq.com/dashboard/ui8-x9n-2rj/equivalent-pull-requests?from_ts=1675905250174&amp;to_ts=1675908850174&amp;live=true\" target=\"_blank\"\u003ehttps://app.datadoghq.com/dashboard/ui8-x9n-2rj/equivalent-pull-requests?from_ts=1675905250174&amp;to_ts=1675908850174&amp;live=true\u003c/a\u003e), while there may have been 50k scenarios over 24hrs, there were only 127 blocks to equivalent prs due to unresolved conversations over a period of 1 hour. Will pull additional data tomorrow.",
+            "content": "after pulling some additional data (https://app.datadoghq.com/dashboard/ui8-x9n-2rj/equivalent-pull-requests?from_ts=1675905250174&to_ts=1675908850174&live=true), while there may have been 50k scenarios over 24hrs, there were only 127 blocks to equivalent prs due to unresolved conversations over a period of 1 hour. Will pull additional data tomorrow."
+          },
+          {
+            "id": "AAAAp_hAba0",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-09T18:55:29.274Z",
+            "modifiedTime": "2023-02-09T18:55:29.274Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Jessica Schumaker",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp69b03WnzsyUIB1xaZboQGJRNJMj_72i_1XTnP-=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "53k in 24 hours, seems like a good amount of hits.  \u003cbr\u003e\u003cbr\u003eWhile it&#39;s a small amount of overall PR traffic, the number of hits seems non-negligible",
+        "content": "53k in 24 hours, seems like a good amount of hits.  \n\nWhile it's a small amount of overall PR traffic, the number of hits seems non-negligible",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "53 thousand times"
+        }
+      },
+      {
+        "id": "AAAAonS182w",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T15:43:04.272Z",
+        "modifiedTime": "2023-02-08T21:31:55.101Z",
+        "resolved": true,
+        "anchor": "kix.z2fhirtk3bhm",
+        "replies": [
+          {
+            "id": "AAAAonS19M4",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T17:18:41.173Z",
+            "modifiedTime": "2023-02-02T17:18:41.173Z",
+            "author": {
+              "displayName": "Gregory Luke Hurrell Stewart (wincent)",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmbDNNbV_V3mOuABESyopi1YsF_DLJ-g9Tqi_U=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "If we&#39;re talking about the same thing, @\u003ca href=\"mailto:jeschu1@github.com\" data-rawHref=\"mailto:jeschu1@github.com\" target=\"_blank\"\u003ejeschu1@github.com\u003c/a\u003e is referring to &quot;PR synchronization&quot;. It doesn&#39;t &quot;close&quot; PRs that pointed to the merged SHA, it marks them as &quot;merged&quot;.",
+            "content": "If we're talking about the same thing, @jeschu1@github.com is referring to \"PR synchronization\". It doesn't \"close\" PRs that pointed to the merged SHA, it marks them as \"merged\"."
+          },
+          {
+            "id": "AAAApf6rsfI",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T16:08:11.954Z",
+            "modifiedTime": "2023-02-03T16:08:11.954Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "interesting! can the user then close the PR? \u003cbr\u003eI guess technically clicking the &quot;merge&quot; button both merges and closes the PR, but if the branch merges out from under you, the PR remains open? That seems ok.",
+            "content": "interesting! can the user then close the PR? \nI guess technically clicking the \"merge\" button both merges and closes the PR, but if the branch merges out from under you, the PR remains open? That seems ok."
+          },
+          {
+            "id": "AAAApf6rsiE",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T16:36:18.608Z",
+            "modifiedTime": "2023-02-03T16:36:18.608Z",
+            "author": {
+              "displayName": "Gregory Luke Hurrell Stewart (wincent)",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmbDNNbV_V3mOuABESyopi1YsF_DLJ-g9Tqi_U=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "It&#39;s a tri-state thing: a PR can be open (green), closed (red), or merged (purple).",
+            "content": "It's a tri-state thing: a PR can be open (green), closed (red), or merged (purple)."
+          },
+          {
+            "id": "AAAApf6rsio",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T16:37:46.904Z",
+            "modifiedTime": "2023-02-03T16:37:46.904Z",
+            "author": {
+              "displayName": "Gregory Luke Hurrell Stewart (wincent)",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmbDNNbV_V3mOuABESyopi1YsF_DLJ-g9Tqi_U=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "So to actually answer your question, a PR whose branch &quot;merges out from under you&quot; will get marked as \u003ci\u003emerged\u003c/i\u003e in the current system, and will continue to do so under the new proposed system, unless we made some effort to avoid that (which would be non-trivial — it detects mergedness based on ahead/behind status, and it has operated that way for many years AFAIK).",
+            "content": "So to actually answer your question, a PR whose branch \"merges out from under you\" will get marked as _merged_ in the current system, and will continue to do so under the new proposed system, unless we made some effort to avoid that (which would be non-trivial — it detects mergedness based on ahead/behind status, and it has operated that way for many years AFAIK)."
+          },
+          {
+            "id": "AAAApf6rsjo",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T16:48:56.814Z",
+            "modifiedTime": "2023-02-03T16:48:56.814Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "@\u003ca href=\"mailto:wincent@github.com\" data-rawHref=\"mailto:wincent@github.com\" target=\"_blank\"\u003ewincent@github.com\u003c/a\u003e , what happens if I open a PR with a branch that just points to the tip of main?\u003cbr\u003eIt seems like that should also be immediately marked as merged, right?",
+            "content": "@wincent@github.com , what happens if I open a PR with a branch that just points to the tip of main?\nIt seems like that should also be immediately marked as merged, right?"
+          },
+          {
+            "id": "AAAApf6rsjw",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T16:50:46.344Z",
+            "modifiedTime": "2023-02-03T16:50:46.344Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "I&#39;m going to pull this one out into its own scenario.",
+            "content": "I'm going to pull this one out into its own scenario."
+          },
+          {
+            "id": "AAAAonANo8Y",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-04T18:55:33.490Z",
+            "modifiedTime": "2023-02-04T18:55:33.490Z",
+            "author": {
+              "displayName": "Gregory Luke Hurrell Stewart (wincent)",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmbDNNbV_V3mOuABESyopi1YsF_DLJ-g9Tqi_U=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "@\u003ca href=\"mailto:zachariahcox@github.com\" data-rawHref=\"mailto:zachariahcox@github.com\" target=\"_blank\"\u003ezachariahcox@github.com\u003c/a\u003e If you try it out, you&#39;ll see you can&#39;t do it (You&#39;ll won&#39;t get past &quot;There isn’t anything to compare. main and blah are identical.&quot; in the PR creation flow.)",
+            "content": "@zachariahcox@github.com If you try it out, you'll see you can't do it (You'll won't get past \"There isn’t anything to compare. main and blah are identical.\" in the PR creation flow.)"
+          },
+          {
+            "id": "AAAAp_jN9qU",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T15:58:33.611Z",
+            "modifiedTime": "2023-02-07T15:58:33.611Z",
+            "author": {
+              "displayName": "Daryl Cantrell",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCnZznu-yJBR098IzdiakvMPoJSigTIeyk_NeKxJ=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "This is true, I just tried it.\u003cbr\u003e\u003cbr\u003eHas it always been true? I was under the impression that some developers like to create a new branch, and start a PR back into the main branch as part of their workflow. I guess this isn&#39;t actually possible now?",
+            "content": "This is true, I just tried it.\n\nHas it always been true? I was under the impression that some developers like to create a new branch, and start a PR back into the main branch as part of their workflow. I guess this isn't actually possible now?"
+          },
+          {
+            "id": "AAAAppWeaMw",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-07T18:46:15.171Z",
+            "modifiedTime": "2023-02-07T18:46:15.171Z",
+            "author": {
+              "displayName": "Gregory Luke Hurrell Stewart (wincent)",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmbDNNbV_V3mOuABESyopi1YsF_DLJ-g9Tqi_U=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "I can&#39;t speak to how far back this might go @\u003ca href=\"mailto:darylcantrell@github.com\" data-rawHref=\"mailto:darylcantrell@github.com\" target=\"_blank\"\u003edarylcantrell@github.com\u003c/a\u003e but it is a looong time (predates my arrival at GitHub by some margin, for sure, and that was in mid-2021). Developers can definitely create branches from arbitrary starting points (main, master, or otherwise), but in order to actually open a PR, the branch will need at least one commit that&#39;s not on the target branch.",
+            "content": "I can't speak to how far back this might go @darylcantrell@github.com but it is a looong time (predates my arrival at GitHub by some margin, for sure, and that was in mid-2021). Developers can definitely create branches from arbitrary starting points (main, master, or otherwise), but in order to actually open a PR, the branch will need at least one commit that's not on the target branch."
+          },
+          {
+            "id": "AAAApoQo6XM",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T21:31:55.101Z",
+            "modifiedTime": "2023-02-08T21:31:55.101Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "@\u003ca href=\"mailto:jeschu1@github.com\" data-rawHref=\"mailto:jeschu1@github.com\" target=\"_blank\"\u003ejeschu1@github.com\u003c/a\u003e mentioned that this process happens async in a job. \u003cbr\u003eit probably closes any prs which pointed to this sha. We should review what we want to change there. cc: @\u003ca href=\"mailto:darylcantrell@github.com\" data-rawHref=\"mailto:darylcantrell@github.com\" target=\"_blank\"\u003edarylcantrell@github.com\u003c/a\u003e",
+        "content": "@jeschu1@github.com mentioned that this process happens async in a job. \nit probably closes any prs which pointed to this sha. We should review what we want to change there. cc: @darylcantrell@github.com",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "We will close all equivalent PRs in a mergeable state, ignoring any others."
+        }
+      },
+      {
+        "id": "AAAAonS18xI",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T15:13:04.517Z",
+        "modifiedTime": "2023-02-03T17:10:09.066Z",
+        "resolved": false,
+        "anchor": "kix.cgeiudbzk8ef",
+        "replies": [
+          {
+            "id": "AAAAonS1820",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T15:47:13.590Z",
+            "modifiedTime": "2023-02-02T15:47:13.590Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "I suspect it would be like a no-op pr, like if I immediately open a PR for my new branch that currently points to the tip of main.",
+            "content": "I suspect it would be like a no-op pr, like if I immediately open a PR for my new branch that currently points to the tip of main."
+          },
+          {
+            "id": "AAAApf6rsko",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-03T17:10:09.066Z",
+            "modifiedTime": "2023-02-03T17:10:09.066Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "I&#39;m not particularly tied to this outcome. \u003cbr\u003eThe important thing is that in the history of main, it&#39;s possible to link to the completed PR that was mergeable, and that we do not link to equivalent PR which were not mergeable.",
+            "content": "I'm not particularly tied to this outcome. \nThe important thing is that in the history of main, it's possible to link to the completed PR that was mergeable, and that we do not link to equivalent PR which were not mergeable."
+          }
+        ],
+        "author": {
+          "displayName": "Michael Haggerty",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a-/AD5-WClNNQ57LgPvDdKRujUXd0eHXCvp1kDL5ANWI5DZuA=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "Whoa, what does it mean for a PR to be unmerged even though its commits have all, in fact, been merged to its target branch? How would people know that it&#39;s now pointless to review the PR? What happens if it subsequently gets approval? Does it become mergeable? What if somebody then clicks on the merge button? &quot;Psyche! We already merged that for you a week ago!&quot; It seems like the entrance to a topsy-turvy world.",
+        "content": "Whoa, what does it mean for a PR to be unmerged even though its commits have all, in fact, been merged to its target branch? How would people know that it's now pointless to review the PR? What happens if it subsequently gets approval? Does it become mergeable? What if somebody then clicks on the merge button? \"Psyche! We already merged that for you a week ago!\" It seems like the entrance to a topsy-turvy world.",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Unmergeable PRs will stay open."
+        }
+      },
+      {
+        "id": "AAAAon52-L8",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T02:17:02.917Z",
+        "modifiedTime": "2023-02-02T14:39:54.228Z",
+        "resolved": true,
+        "anchor": "kix.hjbu2vl467tc",
+        "replies": [
+          {
+            "id": "AAAAon52-So",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T03:20:33.691Z",
+            "modifiedTime": "2023-02-02T03:20:33.691Z",
+            "author": {
+              "displayName": "Jarrod Schnapper",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "@\u003ca href=\"mailto:jeschu1@github.com\" data-rawHref=\"mailto:jeschu1@github.com\" target=\"_blank\"\u003ejeschu1@github.com\u003c/a\u003e has data on that!",
+            "content": "@jeschu1@github.com has data on that!"
+          },
+          {
+            "id": "AAAAon52-Z4",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T04:37:21.271Z",
+            "modifiedTime": "2023-02-02T04:37:21.271Z",
+            "author": {
+              "displayName": "Jessica Schumaker",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp69b03WnzsyUIB1xaZboQGJRNJMj_72i_1XTnP-=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "We should clarify this to say Git Client or API merges.\u003cbr\u003e\u003cbr\u003eWe get thousand of Git Client or API merge requests an hour.  \u003cbr\u003e\u003cbr\u003eOne interesting use case was a customer that wrote their own merge queue implementation via our API.\u003cbr\u003e\u003cbr\u003eHowever, we don&#39;t have stats on how many of these manual merges have multiple PRs.",
+            "content": "We should clarify this to say Git Client or API merges.\n\nWe get thousand of Git Client or API merge requests an hour.  \n\nOne interesting use case was a customer that wrote their own merge queue implementation via our API.\n\nHowever, we don't have stats on how many of these manual merges have multiple PRs."
+          },
+          {
+            "id": "AAAAonS18tI",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T14:39:54.228Z",
+            "modifiedTime": "2023-02-02T14:39:54.228Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Jim Wang",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmrYz5OBnssnzKD6UZYb0IzhmAVLC-1Jjf7UQbEeA=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "I vaguely remember this coming up elsewhere, but how common is the merge from command line flow?",
+        "content": "I vaguely remember this coming up elsewhere, but how common is the merge from command line flow?",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Command line merge"
+        }
+      },
+      {
+        "id": "AAAAon52-L4",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T02:15:37.060Z",
+        "modifiedTime": "2023-02-08T21:30:47.183Z",
+        "resolved": true,
+        "anchor": "kix.f3sv0ht2631j",
+        "replies": [
+          {
+            "id": "AAAAon52-TA",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T03:33:34.809Z",
+            "modifiedTime": "2023-02-02T03:33:34.809Z",
+            "author": {
+              "displayName": "Jarrod Schnapper",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "Today, if there are multiple equivalent PRs, then if one has fulfilled all its requirements then all of the equivalent PRs must also be fulfilled (because anything blocking one would be shared with the others). So, if one is mergeable, pushing a merge commit would close all of the equivalent PRs with the merge commit generated via the command line. \u003cbr\u003e\u003cbr\u003eBut let&#39;s say somehow we had one in a mergeable state and one blocked (not sure if this is possible, but maybe 1 required status check is goofed up and blocking one of the equivalent prs), then I believe pushing a merge commit would be blocked.\u003cbr\u003e\u003cbr\u003e@\u003ca href=\"mailto:darylcantrell@github.com\" data-rawHref=\"mailto:darylcantrell@github.com\" target=\"_blank\"\u003edarylcantrell@github.com\u003c/a\u003e correct me if I&#39;m wrong",
+            "content": "Today, if there are multiple equivalent PRs, then if one has fulfilled all its requirements then all of the equivalent PRs must also be fulfilled (because anything blocking one would be shared with the others). So, if one is mergeable, pushing a merge commit would close all of the equivalent PRs with the merge commit generated via the command line. \n\nBut let's say somehow we had one in a mergeable state and one blocked (not sure if this is possible, but maybe 1 required status check is goofed up and blocking one of the equivalent prs), then I believe pushing a merge commit would be blocked.\n\n@darylcantrell@github.com correct me if I'm wrong"
+          },
+          {
+            "id": "AAAAonS18pU",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T14:26:38.372Z",
+            "modifiedTime": "2023-02-02T14:26:38.372Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "This is an edge case, but using similar logic to point 1.1, we allow merging any PR in an approved state, regardless of of how many are not in an approved state. \u003cbr\u003e\u003cbr\u003eThe main idea here is that we no longer aggregate anything.",
+            "content": "This is an edge case, but using similar logic to point 1.1, we allow merging any PR in an approved state, regardless of of how many are not in an approved state. \n\nThe main idea here is that we no longer aggregate anything."
+          },
+          {
+            "id": "AAAAonS19PI",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T17:32:29.093Z",
+            "modifiedTime": "2023-02-02T17:32:29.093Z",
+            "author": {
+              "displayName": "Jim Wang",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmrYz5OBnssnzKD6UZYb0IzhmAVLC-1Jjf7UQbEeA=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "Right makes sense - I guess my concern is that this is technically a &quot;breaking change&quot;. Logic is sound though, more of a &quot;how do we communicate this behavior change&quot; when folks may be used to the previous behavior.",
+            "content": "Right makes sense - I guess my concern is that this is technically a \"breaking change\". Logic is sound though, more of a \"how do we communicate this behavior change\" when folks may be used to the previous behavior."
+          },
+          {
+            "id": "AAAApoQo6XA",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T21:30:43.138Z",
+            "modifiedTime": "2023-02-08T21:30:43.138Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "we suspect this will impact almost no one. @\u003ca href=\"mailto:jschnapper@github.com\" data-rawHref=\"mailto:jschnapper@github.com\" target=\"_blank\"\u003ejschnapper@github.com\u003c/a\u003e will add and collect some new numbers to check our assumptions.",
+            "content": "we suspect this will impact almost no one. @jschnapper@github.com will add and collect some new numbers to check our assumptions."
+          },
+          {
+            "id": "AAAApoQo6XE",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-08T21:30:47.183Z",
+            "modifiedTime": "2023-02-08T21:30:47.183Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Jim Wang",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmrYz5OBnssnzKD6UZYb0IzhmAVLC-1Jjf7UQbEeA=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "This seems like the riskiest/least intuitive part of the flow. What happens today if you attempt this?",
+        "content": "This seems like the riskiest/least intuitive part of the flow. What happens today if you attempt this?",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "This is legal as long as at least one of them is in an independently mergeable state."
+        }
+      },
+      {
+        "id": "AAAAon52-L0",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-02T02:14:21.370Z",
+        "modifiedTime": "2023-02-02T14:18:30.522Z",
+        "resolved": true,
+        "anchor": "kix.cw65amys6yf",
+        "replies": [
+          {
+            "id": "AAAAonS18ow",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T14:17:49.701Z",
+            "modifiedTime": "2023-02-02T14:17:49.701Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "Yes, I can make that more crisp.",
+            "content": "Yes, I can make that more crisp."
+          },
+          {
+            "id": "AAAAonS18o4",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T14:18:30.522Z",
+            "modifiedTime": "2023-02-02T14:18:30.522Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Jim Wang",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCmrYz5OBnssnzKD6UZYb0IzhmAVLC-1Jjf7UQbEeA=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "I think here you mean you will consider PR2 with SHA abc to be mergable?",
+        "content": "I think here you mean you will consider PR2 with SHA abc to be mergable?",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "We will consider SHA abc to be mergeable"
+        }
+      },
+      {
+        "id": "AAAAoq3K0DU",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-01T21:30:18.675Z",
+        "modifiedTime": "2023-02-02T14:23:35.707Z",
+        "resolved": true,
+        "anchor": "kix.rcqtx8sbyn8n",
+        "replies": [
+          {
+            "id": "AAAAonS18pQ",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T14:23:35.707Z",
+            "modifiedTime": "2023-02-02T14:23:35.707Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "@\u003ca href=\"mailto:darylcantrell@github.com\" data-rawHref=\"mailto:darylcantrell@github.com\" target=\"_blank\"\u003edarylcantrell@github.com\u003c/a\u003e to comment on what we should do here.",
+        "content": "@darylcantrell@github.com to comment on what we should do here.",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "If a branch is merged while PRs governing equivalent branches are not mergeable, the unmergeable PRs will stay open."
+        }
+      },
+      {
+        "id": "AAAAoq3K0Cw",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-01T21:26:48.353Z",
+        "modifiedTime": "2023-02-01T21:28:55.174Z",
+        "resolved": true,
+        "anchor": "kix.2fdck45x5jcm",
+        "replies": [
+          {
+            "id": "AAAAoq3K0DI",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-01T21:28:55.174Z",
+            "modifiedTime": "2023-02-01T21:28:55.174Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "this is still not clear",
+        "content": "this is still not clear",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Command line merges will close at most a single PR\nIf a branch is merged while equivalent PRs are not mergeable, the unfulfilled PRs will stay open.\nIf multiple equivalent PRs are mergeable, only the one chosen to generate the merge commit message (and therefore linked to the commit) is closed."
+        }
+      },
+      {
+        "id": "AAAAojDsHTQ",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-01T17:14:23.703Z",
+        "modifiedTime": "2023-02-01T17:34:40.811Z",
+        "resolved": true,
+        "anchor": "kix.l0tw20tx2jfl",
+        "replies": [
+          {
+            "id": "AAAAojDsHUo",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-01T17:34:40.811Z",
+            "modifiedTime": "2023-02-01T17:34:40.811Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Jarrod Schnapper",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "you can make it look pre-formatted by adding ` ` characters like in markdown",
+        "content": "you can make it look pre-formatted by adding ` ` characters like in markdown",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "abc"
+        }
+      },
+      {
+        "id": "AAAAojDsHS4",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-01T17:13:00.585Z",
+        "modifiedTime": "2023-02-01T17:16:26.669Z",
+        "resolved": true,
+        "anchor": "kix.7tapttyquhn1",
+        "replies": [
+          {
+            "id": "AAAAojDsHTI",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-01T17:13:30.325Z",
+            "modifiedTime": "2023-02-01T17:13:30.325Z",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "not sure -- see below.",
+            "content": "not sure -- see below."
+          },
+          {
+            "id": "AAAAojDsHTU",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-01T17:16:26.669Z",
+            "modifiedTime": "2023-02-01T17:16:26.669Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Jarrod Schnapper",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Jarrod Schnapper",
+          "kind": "drive#user",
+          "me": false,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "is this chosen at random?",
+        "content": "is this chosen at random?",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "only the one chosen"
+        }
+      },
+      {
+        "id": "AAAAojDsHQ0",
+        "kind": "drive#comment",
+        "createdTime": "2023-02-01T16:48:02.276Z",
+        "modifiedTime": "2023-02-02T14:20:26.864Z",
+        "resolved": true,
+        "anchor": "kix.q3htk14ds1v2",
+        "replies": [
+          {
+            "id": "AAAAojDsHVc",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-01T18:04:52.362Z",
+            "modifiedTime": "2023-02-01T18:04:52.362Z",
+            "author": {
+              "displayName": "Daryl Cantrell",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a-/AD5-WCnZznu-yJBR098IzdiakvMPoJSigTIeyk_NeKxJ=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "We look through all of them and see if any PRs are fully &quot;green&quot;.\u003cbr\u003e\u003cbr\u003eI would argue that we should store the final merge commit with the PRs which are green, but not those which are not passing. This lets the user follow the link from the commit to a passing PR, which is a good auditing experience.",
+            "content": "We look through all of them and see if any PRs are fully \"green\".\n\nI would argue that we should store the final merge commit with the PRs which are green, but not those which are not passing. This lets the user follow the link from the commit to a passing PR, which is a good auditing experience."
+          },
+          {
+            "id": "AAAAojDsHXw",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-01T18:20:32.658Z",
+            "modifiedTime": "2023-02-01T18:20:32.658Z",
+            "author": {
+              "displayName": "Jarrod Schnapper",
+              "kind": "drive#user",
+              "me": false,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp5N0bFcSpg0XHQN3hw3jrkvd_H3-tbR5I749JXv=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "would we close all the &quot;green&quot; PRs on merge or just one?",
+            "content": "would we close all the \"green\" PRs on merge or just one?"
+          },
+          {
+            "id": "AAAAonS18pA",
+            "kind": "drive#reply",
+            "createdTime": "2023-02-02T14:20:26.864Z",
+            "modifiedTime": "2023-02-02T14:20:26.864Z",
+            "action": "resolve",
+            "author": {
+              "displayName": "Zachariah Cox",
+              "kind": "drive#user",
+              "me": true,
+              "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+            },
+            "deleted": false,
+            "htmlContent": "",
+            "content": ""
+          }
+        ],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "@\u003ca href=\"mailto:darylcantrell@github.com\" data-rawHref=\"mailto:darylcantrell@github.com\" target=\"_blank\"\u003edarylcantrell@github.com\u003c/a\u003e how do we do this?",
+        "content": "@darylcantrell@github.com how do we do this?",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "When there are more than one, we will pick one."
+        }
+      },
+      {
+        "id": "AAAAoQ89xzw",
+        "kind": "drive#comment",
+        "createdTime": "2023-01-30T15:47:07.508Z",
+        "modifiedTime": "2023-01-30T17:14:20.042Z",
+        "resolved": false,
+        "anchor": "kix.limgmroe9occ",
+        "replies": [],
+        "author": {
+          "displayName": "Zachariah Cox",
+          "kind": "drive#user",
+          "me": true,
+          "photoLink": "//lh3.googleusercontent.com/a/AEdFTp6caL1JJmqf6TmKCbZsmgnXQmSGf70tJKsd7Yp3=s50-c-k-no"
+        },
+        "deleted": false,
+        "htmlContent": "maybe &quot;pull requests do not share mergeability criteria&quot;",
+        "content": "maybe \"pull requests do not share mergeability criteria\"",
+        "quotedFileContent": {
+          "mimeType": "text/html",
+          "value": "Isolate pull request approvals to their respective pull request"
+        }
+      }
+    ],
+    "nextPageToken": "MjA="
+  }
+  
