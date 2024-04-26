@@ -8,17 +8,25 @@ import yaml
 
 def load_org_chart(d):
     # load manager to employee map
-    hierarchy = {}
+    manager_to_employees = {}
+    employee_to_manager = {}
+
     for meta in d.values():
         user = meta['github_login']
         manager = meta['manager'] # managers are logins, not emails.
         if user == manager:
             continue # not allowed to report to yourself (though this shows up in the data sometimes).
-        employees = hierarchy.get(manager)
+        
+        # we know the manager
+        employee_to_manager[user] = manager
+
+        # find the employees
+        employees = manager_to_employees.get(manager)
         if not employees:
-            hierarchy[manager] = employees = set()
+            manager_to_employees[manager] = employees = set()
         employees.add(user)
-    return hierarchy
+
+    return manager_to_employees, employee_to_manager
 
 def org_size_count(h, include_managers=True):
     counts = {}
@@ -44,6 +52,7 @@ def org_size_count(h, include_managers=True):
 def save_kusto_datatable(
         filename, 
         org_chart, 
+        employee_to_manager,
         org_counts, 
         ic_counts
     ):
@@ -53,9 +62,16 @@ def save_kusto_datatable(
 
     # file generation
     with open(filename, 'w') as out:
-        out.write("datatable(director:string, reports_direct:long, reports_all:long, reports_ic:long)[\n")
+        out.write("datatable(m3:string, director:string, reports_direct:long, reports_all:long, reports_ic:long)[\n")
         for m in sorted(org_chart.keys()):
-            out.write(", ".join(str(e) for e in ['"' + m + '"', len(org_chart[m]), org_counts[m], ic_counts[m]]) + ",\n")
+            row_values = [
+                '"' + employee_to_manager.get(m, "") + '"', 
+                '"' + m + '"', 
+                len(org_chart[m]), 
+                org_counts[m], 
+                ic_counts[m]
+                ]
+            out.write(", ".join(str(e) for e in row_values) + ",\n")
         out.write("]\n")
 
 if __name__ == "__main__":
@@ -69,9 +85,9 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
-    org_chart = load_org_chart(data)
-    c = org_size_count(org_chart)
-    ic = org_size_count(org_chart, include_managers=False)
+    manager_to_employees, employee_to_manager = load_org_chart(data)
+    c = org_size_count(manager_to_employees)
+    ic = org_size_count(manager_to_employees, include_managers=False)
     output_file = os.path.join(os.path.dirname(f), "output.kql")
-    
-    save_kusto_datatable(output_file, org_chart, c, ic)
+
+    save_kusto_datatable(output_file, manager_to_employees, employee_to_manager, c, ic)
