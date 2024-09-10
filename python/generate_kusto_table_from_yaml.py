@@ -1,5 +1,6 @@
 """
 Generate kusto table from employee data
+Such as: https://github.com/github/thehub/blob/main/docs/_data/hubbers.yml
 @zachariahcox
 """
 import os
@@ -16,7 +17,7 @@ def load_org_chart(d):
         manager = meta['manager'] # managers are logins, not emails.
         if user == manager:
             continue # not allowed to report to yourself (though this shows up in the data sometimes).
-        
+
         # we know the manager
         employee_to_manager[user] = manager
 
@@ -30,7 +31,7 @@ def load_org_chart(d):
 
 def org_size_count(h, include_managers=True):
     counts = {}
-    
+
     def sub_org_size(m):
         count = counts.get(m)
         if count is None:
@@ -43,36 +44,25 @@ def org_size_count(h, include_managers=True):
                         count += 1
             counts[m] = count
         return count
-    
+
     for m in h.keys():
         counts[m] = sub_org_size(m)
 
     return counts
 
-def save_kusto_datatable(
-        filename, 
-        org_chart, 
-        employee_to_manager,
-        org_counts, 
-        ic_counts
-    ):
-    # clean up
-    if os.path.exists(filename):
-        os.remove(filename)
-
-    # file generation
-    with open(filename, 'w') as out:
-        out.write("datatable(m3:string, director:string, reports_direct:long, reports_all:long, reports_ic:long)[\n")
-        for m in sorted(org_chart.keys()):
-            row_values = [
-                '"' + employee_to_manager.get(m, "") + '"', 
-                '"' + m + '"', 
-                len(org_chart[m]), 
-                org_counts[m], 
-                ic_counts[m]
-                ]
-            out.write(", ".join(str(e) for e in row_values) + ",\n")
-        out.write("]\n")
+def reporting_chain(manager_to_employees, employee_to_manager):
+    chains = {}
+    for m in manager_to_employees.keys():
+        chain = []
+        current_manager = m
+        while True:
+            next_manager = employee_to_manager.get(current_manager)
+            if not next_manager or next_manager == current_manager:
+                break
+            chain.append(next_manager)
+            current_manager = next_manager
+        chains[m] = chain
+    return chains
 
 if __name__ == "__main__":
     assert len(sys.argv) == 2, 'please provide the path to a data file.'
@@ -86,8 +76,25 @@ if __name__ == "__main__":
             print(exc)
 
     manager_to_employees, employee_to_manager = load_org_chart(data)
-    c = org_size_count(manager_to_employees)
-    ic = org_size_count(manager_to_employees, include_managers=False)
+    chain = reporting_chain(manager_to_employees, employee_to_manager)
+    org_counts = org_size_count(manager_to_employees)
+    ic_counts = org_size_count(manager_to_employees, include_managers=False)
     output_file = os.path.join(os.path.dirname(f), "output.kql")
 
-    save_kusto_datatable(output_file, manager_to_employees, employee_to_manager, c, ic)
+    # clean up
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+    # file generation
+    with open(output_file, 'w') as out:
+        out.write("datatable(manager:string, reporting_chain:string, reports_direct:long, reports_all:long, reports_ic:long)[\n")
+        for m in sorted(manager_to_employees.keys()):
+            row_values = [
+                '"' + m + '"',
+                '"' + ",".join(chain[m]) + '"', # in kusto convert into array by split(column, ",")
+                len(manager_to_employees[m]),
+                org_counts[m],
+                ic_counts[m]
+                ]
+            out.write(", ".join(str(e) for e in row_values) + ",\n")
+        out.write("]\n")
