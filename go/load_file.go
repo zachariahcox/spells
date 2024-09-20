@@ -8,10 +8,6 @@ import (
 	"time"
 )
 
-func swap(x string, y string) (string, string) {
-	return y, x
-}
-
 var all_words []string
 
 func load_all_words() {
@@ -19,7 +15,7 @@ func load_all_words() {
 		return // all done!
 	}
 
-	contents, err := os.ReadFile("words.txt")
+	contents, err := os.ReadFile("words.txt") // automatically closes it
 	if err != nil {
 		fmt.Println("File reading error", err)
 		return
