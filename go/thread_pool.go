@@ -1,12 +1,10 @@
-import (
-	"fmt"
-)
+package main
 
 type Job struct {
 	Payload string
 }
 
-func (*job) DoIt() {
+func (*Job) DoIt() {
 	print("completed job", job.Payload)
 }
 
@@ -17,7 +15,7 @@ type Worker struct {
 }
 
 func NewWorker(workerPool chan chan Job) *Worker {
-	return Worker{
+	return &Worker{
 		WorkerPool: workerPool,
 		JobChannel: make(chan Job),
 		quit:       make(chan bool),
@@ -66,16 +64,6 @@ func NewDispatcher(maxWorkers int) *Dispatcher {
 	return &Dispatcher{WorkerPool: pool}
 }
 
-func (d *Dispatcher) Run() {
-	// starting n number of workers
-	for i := 0; i < d.maxWorkers; i++ {
-		worker := NewWorker(d.pool)
-		worker.Start()
-	}
-
-	go d.dispatch()
-}
-
 func (d *Dispatcher) dispatch() {
 	for {
 		select {
@@ -93,32 +81,19 @@ func (d *Dispatcher) dispatch() {
 	}
 }
 
+func (d *Dispatcher) Run() {
+	for i := 0; i < cap(d.WorkerPool); i++ {
+		worker := NewWorker(d.WorkerPool)
+		worker.Start()
+	}
+
+	go d.dispatch()
+}
+
 func main() {
-	// // make a work-passing channel
-	// workChannel := make(chan string)
+	d := NewDispatcher(5)
+	d.Run()
 
-	// // make a workgroup to prevent this function from returning
-	// //  until all the goroutines are done
-	// wg := new(sync.WaitGroup)
+	JobQueue = make(chan Job)
 
-	// // how many goroutines to run at once?
-	// // goroutines are much cheaper than threads -- many can run on the same OS thread.
-	// // golang uses dynamic stack sizes but they are small -- maybe 4k per stack.
-	// //   you can then put 1M goroutines on a machine with 4GB of memory.
-	// numberOfGoRoutines := 250
-
-	// // Adding routines to workgroup and running then
-	// for i := 0; i < numberOfGoRoutines; i++ {
-	// 	wg.Add(1)
-	// 	go worker(workChannel, wg)
-	// }
-
-	// // Processing all links by spreading them to `free` goroutines
-	// for _, link := range yourLinksSlice {
-	// 	workChannel <- link
-	// }
-
-	// // wait for all the goroutines to finish
-	// close(workChannel)
-	// wg.Wait()
 }
