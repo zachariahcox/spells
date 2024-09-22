@@ -2,19 +2,13 @@
 
 package main
 
-import (
-	"fmt"
-	"sync"
-)
-
 type Job struct {
-	Id        int
-	Completed bool
+	Id          int
+	CompletedBy int
 }
 
-func (j *Job) DoIt() {
-	fmt.Println("completed job", j.Id)
-	j.Completed = true
+func (j *Job) DoIt(workerId int) {
+	j.CompletedBy = workerId
 }
 
 type Result struct {
@@ -22,15 +16,17 @@ type Result struct {
 }
 
 type Worker struct {
-	WorkerPool chan chan Job
-	JobChannel chan Job
+	Id         int
+	WorkerPool chan chan *Job
+	JobChannel chan *Job
 	quit       chan bool
 }
 
-func NewWorker(workerPool chan chan Job) *Worker {
+func NewWorker(id int, workerPool chan chan *Job) *Worker {
 	return &Worker{
+		Id:         id,
 		WorkerPool: workerPool,
-		JobChannel: make(chan Job),
+		JobChannel: make(chan *Job),
 		quit:       make(chan bool),
 	}
 }
@@ -48,7 +44,7 @@ func (w *Worker) Start() {
 			select {
 			case job := <-w.JobChannel:
 				// we have received a job to do
-				job.DoIt()
+				job.DoIt(w.Id)
 
 			case <-w.quit:
 				// we have received a signal to stop
@@ -65,28 +61,25 @@ func (w *Worker) Stop() {
 	}()
 }
 
-// A buffered channel that we can send work requests on.
-var JobQueue chan Job
-
 type Dispatcher struct {
 	// this is a channel of each worker's job channel
-	WorkerPool chan chan Job
+	WorkerPool chan chan *Job
+	JobQueue   <-chan *Job
 }
 
-func NewDispatcher(maxWorkers int) *Dispatcher {
-
-	pool := make(chan chan Job, maxWorkers)
-	return &Dispatcher{WorkerPool: pool}
+func NewDispatcher(jobQueue <-chan *Job, maxWorkers int) *Dispatcher {
+	pool := make(chan chan *Job, maxWorkers)
+	return &Dispatcher{WorkerPool: pool, JobQueue: jobQueue}
 }
 
 func (d *Dispatcher) dispatch() {
 	for {
 		select {
-		case job := <-JobQueue:
+		case job := <-d.JobQueue:
 			// a job request has been received
-			go func(job Job) {
+			go func(job *Job) {
 				// try to obtain a worker job channel that is available.
-				// this will block until a worker is idle
+				// (this will block until a worker is idle)
 				jobChannel := <-d.WorkerPool
 
 				// dispatch the job to the worker job channel
@@ -98,67 +91,38 @@ func (d *Dispatcher) dispatch() {
 
 func (d *Dispatcher) Run() {
 	for i := 0; i < cap(d.WorkerPool); i++ {
-		worker := NewWorker(d.WorkerPool)
+		worker := NewWorker(i, d.WorkerPool)
 		worker.Start()
 	}
-
 	go d.dispatch()
 }
 
-func DistributeABunchOfWork_OneShot(jobs []*Job, workerCount int) []*Result {
-	jobCount := len(jobs)
-	jobQueue := make(chan *Job, jobCount)
-	results := make(chan *Result, jobCount)
-
-	// Start workers
-	var wg sync.WaitGroup
-	wg.Add(workerCount)
-	for w := 1; w <= workerCount; w++ {
-		go func() {
-			defer wg.Done() // each worker gets one list of jobs?
-			for job := range jobQueue {
-				job.DoIt()
-				results <- &Result{Job: job}
-			}
-		}()
-	}
-
-	// Start results collector
-	var resultsWg sync.WaitGroup
-	finishedWorkChannel := make(chan []*Result, 1)
-	resultsWg.Add(1)
-	go func() {
-		defer resultsWg.Done()
-		rc := make([]*Result, 0, jobCount)
-		for result := range results {
-			fmt.Println("result for job", result.Job.Id)
-			rc = append(rc, result)
-		}
-		finishedWorkChannel <- rc // "return" values are passed via channel
-	}()
-
-	// Distribute jobs and wait for completion
-	// there is no better way in golang to add all things to a channel
-	for _, job := range jobs {
-		jobQueue <- job
-	}
-	close(jobQueue)  // close the channel to signal that there are no more jobs
-	wg.Wait()        // wait for all workers to finish
-	close(results)   // the workers are done, so close the results channel to signal that there are no more results
-	resultsWg.Wait() // wait for the results to be collected
-
-	return <-finishedWorkChannel
-}
-
 func main() {
-
-	// create pile of work to do
-	jobs := make([]*Job, 0, 100)
-	for i := 1; i <= 100; i++ {
-		jobs = append(jobs, &Job{Id: i})
-	}
+	numberOfJobs := 1000
+	numberOfWorkers := 10
+	jobQueue := make(chan *Job)
 
 	// create a dispatcher and start it
-	results := DistributeABunchOfWork_OneShot(jobs, 10)
-	fmt.Println("processed", len(jobs), "jobs and received", len(results), "results")
+	dispatcher := NewDispatcher(jobQueue, numberOfWorkers)
+	dispatcher.Run()
+
+	// create pile of work to do
+	for i := 0; i < numberOfJobs; i++ {
+		jobQueue <- &Job{Id: i}
+	}
+	close(jobQueue) // close the channel to signal that there are no more jobs
+
+	// fmt.Println("processed", numberOfJobs, "jobs and received", len(results), "results")
+
+	// how evenly were the jobs distributed?
+	// counts := make([]int, numberOfWorkers)
+	// for _, r := range results {
+	// 	counts[r.ProcessedByWorkerId] += 1
+	// }
+	// sort.Slice(counts, func(i, j int) bool {
+	// 	return counts[i] > counts[j]
+	// })
+	// for id, count := range counts {
+	// 	fmt.Println("worker", id, "processed", count, "jobs")
+	// }
 }

@@ -22,7 +22,7 @@ type Result struct {
 	ProcessedByWorkerId int
 }
 
-func DistributeABunchOfWork_OneShot(jobs []*Job, workerCount int) []*Result {
+func DistributeJobs(jobs []*Job, workerCount int) []*Result {
 	jobCount := len(jobs)
 	jobQueue := make(chan *Job, jobCount)
 	results := make(chan *Result, jobCount)
@@ -81,7 +81,7 @@ func main() {
 
 	// create a dispatcher and start it
 	startTime := time.Now()
-	results := DistributeABunchOfWork_OneShot(jobs, numberOfWorkers)
+	results := DistributeJobs(jobs, numberOfWorkers)
 	elapsed := time.Since(startTime)
 
 	fmt.Println("processed", len(jobs), "jobs and received", len(results), "results in", elapsed)
