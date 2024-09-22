@@ -13,6 +13,16 @@
             "args": [
                 "/Users/zachariahcox/Downloads/hubbers.yml"
             ]
+        },
+        // run this file golang file with the debugger
+        {
+            "name": "Go: debug file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${file}",
+            "env": {},
+            "args": []
         }
     ]
 }
