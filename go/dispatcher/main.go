@@ -1,6 +1,7 @@
 // dispatcher / worker pattern for unknown amounts of work
+package dispatcher
 
-package main
+import "fmt"
 
 type Job struct {
 	Id          int
@@ -9,6 +10,7 @@ type Job struct {
 
 func (j *Job) DoIt(workerId int) {
 	j.CompletedBy = workerId
+	fmt.Println("job #", j.Id, "completed by worker #", workerId)
 }
 
 type Result struct {
@@ -105,6 +107,10 @@ func main() {
 	// create a dispatcher and start it
 	dispatcher := NewDispatcher(jobQueue, numberOfWorkers)
 	dispatcher.Run()
+
+	listenerQueue := make(chan *Job)
+	go func() {
+
 
 	// create pile of work to do
 	for i := 0; i < numberOfJobs; i++ {

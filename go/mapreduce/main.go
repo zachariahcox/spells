@@ -1,6 +1,4 @@
-// dispatcher / worker pattern for unknown amounts of work
-
-package main
+package mapreduce
 
 import (
 	"fmt"

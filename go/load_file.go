@@ -8,24 +8,17 @@ import (
 	"time"
 )
 
-var all_words []string
-
-func load_all_words() {
-	if all_words != nil {
-		return // all done!
-	}
-
-	contents, err := os.ReadFile("words.txt") // automatically closes it
+func load_file(path string, delimiter string) []string {
+	contents, err := os.ReadFile(path) // automatically closes it
 	if err != nil {
 		fmt.Println("File reading error", err)
-		return
+		return nil
 	}
-	all_words = strings.Split(strings.ToLower(string(contents)), "\n")
+	return strings.Split(strings.ToLower(string(contents)), delimiter)
 }
 
-func is_real_word(s string) bool {
+func is_real_word(all_words []string, s string) bool {
 	// the word is real if it exists in the list!
-	load_all_words()
 	for _, value := range all_words {
 		if s == value {
 			return true
@@ -37,7 +30,7 @@ func is_real_word(s string) bool {
 func main() {
 	// load words from data set
 	start_time := time.Now()
-	load_all_words()
+	all_words := load_file("words.txt", "\n")
 	end_time := time.Now()
 	fmt.Println("loaded", len(all_words), "words in", int(end_time.UnixMilli())-int(start_time.UnixMilli()), "ms")
 
@@ -56,7 +49,7 @@ func main() {
 	}
 
 	for _, value := range new_words {
-		if is_real_word(value) {
+		if is_real_word(all_words, value) {
 			fmt.Println(value, "IS a real word!")
 		} else {
 			fmt.Println(value, "is NOT a real word.")
