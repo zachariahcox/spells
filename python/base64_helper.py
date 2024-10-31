@@ -2,7 +2,7 @@
 If passed a file path, loads a csv file and expands any hex-encoded fields.
 If passed a string, deserializes and prints content.
 usage:
-$> python deserialize.py /path/to/any/csv_file_containing_hex_encoded_stuff
+$> python base64_helper.py /path/to/any/csv_file_containing_hex_encoded_stuff
 '''
 import sys
 import os

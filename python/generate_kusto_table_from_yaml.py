@@ -1,6 +1,5 @@
 """
-Generate kusto table from employee data
-Such as: https://github.com/github/thehub/blob/main/docs/_data/hubbers.yml
+Generate kusto table from employee data.
 @zachariahcox
 """
 import os

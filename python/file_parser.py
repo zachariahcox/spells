@@ -1,6 +1,6 @@
 '''
-This attempts to parse the output of the slow calls stack flame graph.
-Take those records and stick them in a file, then point this script at that file path.
+This is a basic cli to open and read a file. 
+Example of loading each row into an object. 
 '''
 import sys
 import os
@@ -15,7 +15,6 @@ class Row(object):
 def parse_meta(line):
     # tokens = line.split(' ')
     return line
-
 
 def parse_rows(lines):
     tokens = []
@@ -59,10 +58,11 @@ if __name__ == "__main__":
     with open(f, 'r') as src:
         lines = [l.rstrip() for l in src.readlines()]
 
+    # for csv-like formats, the first line might contain metadata
     meta = parse_meta(lines[0])
     print (meta)
 
-    # parse
+    # parse the rest of the lines
     rows = parse_rows(lines[1:])
     for r in rows:
         print(r)
