@@ -1,3 +1,20 @@
+"""
+The basic idea is you're given a pattern defined by single characters.
+The pattern represent a specific sequence of characters in an input string.
+
+The puzzle is to determine if a a given input string matches the pattern.
+
+The basic solution is to count the number of different characters in the pattern.
+Each character represents a different dimension that needs to be searched.
+IE, for a two character pattern, there's a 2d solution space.
+
+You can make a "guess" as to the lengths of each character in the pattern, then see if that provides a solution.
+A guess is "wrong" if the length of the guess would produce a contradiction.
+
+It's possible to place additional constraint on the guess before proceeding with the validation phase.
+You can make an assertion that the min length of any pattern is 1.
+You can then assert that sum of the lengths of the pattern must be the same as the length of the input string.
+"""
 import math
 
 def solve(pattern, input):
@@ -66,7 +83,6 @@ def solve(pattern, input):
             input_index += len(guess_string)
 
         #result
-        print("found", leng())
         print(guess_strings, "is a OK" if valid else "is BAD")
 
 
