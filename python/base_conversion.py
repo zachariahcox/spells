@@ -3,7 +3,7 @@ import math
 def to_base(number, base):
     digits = []
     while number > 0:
-        digits.append(number % base)
+        digits.append(number % base) # looking for remainders
         number //= base
     return list(reversed(digits))
 
