@@ -9,8 +9,9 @@ def to_base(number, base):
 
 def digits_in_base(number, base):
     # this doesn't 100% work all the time!
+    # floating point math is hard, use the log10 function to hit some lookup tables I think!
     if base == 10:
-        return int(math.log10(number) + 1) # floating point math is hard, use the log10 function to hit some lookup tables I think!
+        return int(math.log10(number) + 1)
     return math.floor(math.log(number, base) + 1)
 
 def test(digits, base):
