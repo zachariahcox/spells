@@ -3,6 +3,7 @@ import os
 import sys
 
 def parse(d):
+    # do whatever you want with the data here
     print(d)
 
 if __name__ == "__main__":
@@ -12,5 +13,5 @@ if __name__ == "__main__":
 
     with open(f, 'r', encoding="utf8") as src:
         data = json.load(src)
-    
+
     parse(data)

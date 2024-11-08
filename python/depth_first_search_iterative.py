@@ -15,22 +15,26 @@ It's possible to place additional constraint on the guess before proceeding with
 You can make an assertion that the min length of any pattern is 1.
 You can then assert that sum of the lengths of the pattern must be the same as the length of the input string.
 """
-import math
 
 def to_base(number, base):
     result = []
     zeros = 0
     while number > 0:
         digit = number % base
-        if digit == 0:
-            zeros += 1
         result.append(digit)
         number //= base
+
+        # keep track of zeros for this particular case
+        if digit == 0:
+            zeros += 1
+
     result.reverse()
     return result, zeros
 
 def solve(pattern, input):
-    # analytics on the pattern, how many modes are there, how many times do they appear?
+    # analytics on the pattern
+    # how many modes are there
+    # how many times do they appear?
     count_by_mode = {}
     for m in pattern:
         c = count_by_mode.get(m, 0)
@@ -38,8 +42,11 @@ def solve(pattern, input):
     unique_mode_count = len(count_by_mode)
     unique_modes = list(sorted(count_by_mode.keys()))
 
+    # the maximum length of any guess is the length of the input string
     max_length = len(input)
-    max_guesses = max_length**unique_mode_count #  search space is the number of possibilities raised to number of unique modes / dimensions
+
+    #  search space is the number of possibilities raised to number of dimensions (digits)
+    max_guesses = max_length**unique_mode_count
 
     # generate guesses by searching every possible combination of lengths for each mode.
     good_guesses = []
@@ -59,13 +66,15 @@ def solve(pattern, input):
         # guess must produce a the same length as the input string
         check_sum = 0
         for j in range(len(guess)):
-            check_sum += count_by_mode[unique_modes[j]] * guess[j]
+            instances_of_mode_in_pattern = count_by_mode[unique_modes[j]]
+            mode_length_guess = guess[j]
+            check_sum += instances_of_mode_in_pattern * mode_length_guess
 
         if check_sum != len(input):
             continue
 
-        # guess must actually match the input string
-        guess_strings = {} # each guess produces a specific string for a given input
+        # guess substrings must actually match the input string
+        guess_strings = {} # each guess produces a specific substring for a given input
         input_index = 0 # where are we in the input string
         valid = True
         for m in pattern:
@@ -91,6 +100,9 @@ def solve(pattern, input):
         # result
         if valid:
             good_guesses.append(guess_strings)
+
+        # log progress in case we need to resume elsewhere
+        # log log log
     return good_guesses
 
 
