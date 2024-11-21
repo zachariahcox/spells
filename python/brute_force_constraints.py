@@ -1,11 +1,12 @@
 """
 solve a 2d constraint problem, brute force, recursive backtracking.
 It will visit all possible solutions using the stack to keep track of state.
+This one is based on the Nqueens problem.
 """
 
 def meets_constraint(board, proposedX, proposedY):
     """
-    return true iff this move would meet the constraints
+    return true iff this move would meet the constraints given the previous state of the board
     """
     # constraint 1: cannot have another move in the same x dimension
     #   (because the algorithm moves low to high x, we only need to check the left values)
@@ -15,57 +16,60 @@ def meets_constraint(board, proposedX, proposedY):
             return False
 
     # constraint 2: no other moves in low direction diagonals
+    #  start from the highest value (proposed x) and move to the left
     x = proposedX
     low_y = proposedY
     high_y = proposedY
     max_rows = len(board)
     while x >= 0:
         # find potential moves in new column
-        x -= 1
-        low_y -= 1
-        high_y += 1
+        x -= 1 # move to the left
+        low_y -= 1 # move down a row
+        high_y += 1 # move up a row
         if x < 0:
-            # we searched the whole range
+            # we searched the whole range and didn't find any previous moves apparently!
             break
 
         if low_y >= 0 and board[low_y][x]:
-            return False
+            return False # found a previous move in the low diagonal
 
         if high_y < max_rows and board[high_y][x]:
-            return False
+            return False # found a previous move in the high diagonal
 
     # seems ok!
     return True
 
 def solve_low_to_high_column_wise(solutions, board, x):
     """
-    return true iff we find a valid move in column x
+    return true when the board has a valid solution
     """
     # find a valid y position for column x
     for y in range(rows):
         if meets_constraint(board, x, y):
-            # found one, propose making the move (we will backtrack at the close of this scope)
+            # found one, store the proposed move in the matrix
+            #   (we will backtrack at the close of this scope)
             board[y][x] = True
 
             # check for complete solution
-            if x == len(board[y]) - 1:
+            if x == len(board[y]) - 1: # last column
                 # this is a valid solution
-                # add to list and keep looking for more.
+                # return True # return True if we only want to find one solution
+
+                # MODIFIED: otherwise, add to list and keep looking for more.
                 solutions.append(deepcopy(board))
 
-                # return true here if we only want to find any solution
-                # return True
-
-            # try to recurse from here
+            # recurse using this matrix as the new state -- if it leads to a solution``
             elif solve_low_to_high_column_wise(solutions, board, x + 1):
                 return True # return True if we only want to find one solution
 
-            # backtrack: reset the bit and try the next row
+            # backtrack: this set of values (y,x) is not part of a solution
+            # reset the bit and try the next y value
             board[y][x] = False
 
     return False # no solution
 
 def deepcopy(matrix):
+    # could also just import copy and use copy.deepcopy
     if matrix is None:
         return None
     if not isinstance(matrix, list):

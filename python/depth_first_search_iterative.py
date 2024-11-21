@@ -42,16 +42,20 @@ def solve(pattern, input):
     unique_mode_count = len(count_by_mode)
     unique_modes = list(sorted(count_by_mode.keys()))
 
-    # the maximum length of any guess is the length of the input string
+    # the min length is 1?
+    # the maximum length of any mode is the length of the input string - (unique_mode_count - 1)
+    # but because we're using this as a guess generator, we need to guess the 11111 case too, so we need to search the whole space.
     max_length = len(input)
 
-    #  search space is the number of possibilities raised to number of dimensions (digits)
+    # search space is the number of possibilities raised to number of dimensions (digits)
+    # O(N^m) where N is len(input) and M is the number of modes that have to be guessed ()
     max_guesses = max_length**unique_mode_count
 
     # generate guesses by searching every possible combination of lengths for each mode.
     good_guesses = []
     for guess_number in range(max_guesses):
-        # convert "guess number" in base 10 to a node in the search space
+        # guess number is the where we are in our search space.
+        # convert "guess number" to a node address in the search space
         guess, zeros = to_base(guess_number, max_length)
 
         # check constraints
