@@ -31,6 +31,13 @@ def to_base(number, base):
     result.reverse()
     return result, zeros
 
+def first_guess(base, digits):
+    # return the first number that has 1s in every digit in base N
+    sum = 0
+    for d in range(digits):
+        sum += base**d
+    return sum
+
 def solve(pattern, input):
     # analytics on the pattern
     # how many modes are there
@@ -52,8 +59,10 @@ def solve(pattern, input):
     max_guesses = max_length**unique_mode_count
 
     # generate guesses by searching every possible combination of lengths for each mode.
+    #  the min possible good guess has 1s in every position, so it's N^m + N^(m-1)...+ N^0?
     good_guesses = []
-    for guess_number in range(max_guesses):
+    start_guess = first_guess(max_length, unique_mode_count)
+    for guess_number in range(start_guess, max_guesses):
         # guess number is the where we are in our search space.
         # convert "guess number" to a node address in the search space
         guess, zeros = to_base(guess_number, max_length)
@@ -63,13 +72,13 @@ def solve(pattern, input):
         if zeros:
             continue
 
-        # guess must have the same number of dimensions as the pattern
+        # must have a guess for every mode (each dimension must have length >= 1
         if len(guess) != unique_mode_count:
             continue
 
-        # guess must produce a the same length as the input string
+        # guess MUST produce a the same length as the input string
         check_sum = 0
-        for j in range(len(guess)):
+        for j in range(unique_mode_count):
             instances_of_mode_in_pattern = count_by_mode[unique_modes[j]]
             mode_length_guess = guess[j]
             check_sum += instances_of_mode_in_pattern * mode_length_guess
@@ -77,7 +86,7 @@ def solve(pattern, input):
         if check_sum != len(input):
             continue
 
-        # guess substrings must actually match the input string
+        # guess substrings MUST actually match the input string
         guess_strings = {} # each guess produces a specific substring for a given input
         input_index = 0 # where are we in the input string
         valid = True
@@ -119,6 +128,7 @@ for p, i in [
     ("abba", "dogcatcatdog"),
     ("abba", "aabbbbaa"),
     ("abc", "abccba"),
+    ("abcdef", "AAAAAAAAAAAAAAAbcdef"),
     ("ababa", "AB BA AB BA AB"),
     ("edcba", "AABCDE")
     ]:
