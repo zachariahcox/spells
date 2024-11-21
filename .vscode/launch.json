@@ -23,6 +23,13 @@
             "program": "${file}",
             "env": {},
             "args": []
+        },
+        {
+            "name": "cli-module-debug",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "cli.main",
+            "args": ["test_name"]
         }
     ]
 }

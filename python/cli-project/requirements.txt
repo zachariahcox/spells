@@ -1,0 +1,1 @@
+-e git+https://github.com/zachariahcox/spells@5285da00afe5fe96e4a7904cd35f6ffccc9f867d#egg=cli&subdirectory=python/cli-project
