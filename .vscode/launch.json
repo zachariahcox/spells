@@ -14,6 +14,16 @@
                 "/Users/zachariahcox/Downloads/hubbers.yml"
             ]
         },
+        {
+            "name": "test pipes.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "${fileDirname}/base64_helper.py"
+            ]
+        },
         // run this file golang file with the debugger
         {
             "name": "Go: debug file",
