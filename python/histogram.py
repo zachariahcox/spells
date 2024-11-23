@@ -34,7 +34,7 @@ d = aggregate((
     ("a", 1),
     ("b", 2),
     ("b", 3),
-    ("c", 1),
+    ("c", 4),
     ))
 
 for k, v in d.items():
