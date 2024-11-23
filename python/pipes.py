@@ -4,11 +4,11 @@ $> cat /path/to/some/file | python pipes.py
 '''
 import sys
 
-# do some work
 def parse(line):
     """
     do work to each line
     """
+    assert(isinstance(line, str))
     print(len(line))
 
 if __name__ == "__main__":
