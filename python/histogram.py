@@ -1,6 +1,6 @@
 
 
-def collect_data(elements):
+def aggregate(elements):
     data_collector = {}
     for key, value in elements:
         metadata = data_collector.get(key)
@@ -17,7 +17,7 @@ def collect_data(elements):
         metadata["sum"] = sum + value
     return data_collector
 
-d = collect_data((
+d = aggregate((
     ("a", 1),
     ("b", 2),
     ("b", 3),
