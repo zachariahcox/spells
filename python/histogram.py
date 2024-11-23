@@ -3,9 +3,9 @@
 def aggregate(elements):
     data_collector = {}
     for key, value in elements:
+        # load state or hydrate
         metadata = data_collector.get(key)
         if not metadata:
-            # hydrate
             data_collector[key] = metadata = {}
 
         # instances of key
