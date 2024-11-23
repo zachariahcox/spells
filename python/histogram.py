@@ -1,6 +1,10 @@
-
-
+'''
+aggregate example
+'''
 def aggregate(elements):
+    '''
+    collect stats for histogram-like use cases
+    '''
     data_collector = {}
     for key, value in elements:
         # load state or hydrate
@@ -15,6 +19,15 @@ def aggregate(elements):
         # sum of value
         sum = metadata.get("sum", 0)
         metadata["sum"] = sum + value
+
+        # min of value
+        min = metadata.get("min", value)
+        metadata["min"] = value if value < min else min
+
+        # max of value
+        max = metadata.get("max", value)
+        metadata["max"] = value if value > max else max
+
     return data_collector
 
 d = aggregate((
