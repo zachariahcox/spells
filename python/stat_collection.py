@@ -7,14 +7,10 @@ import re
 dataFile = sys.argv[1]
 illegalCount = 0
 totalCount = 0
+maxLegalNodes = 6 # this is actually very forgiving, but accounts for the max like: stage.2.phase.2.job.2
+legalPattern = re.compile("^[a-zA-Z0-9_]+$") # node names are allowed to contain upper and lowercase letters, numbers and _ according to the docs.
 
-# we allow upper and lowercase letters, numbers and _ according to the docs.
-legalPattern = re.compile("^[a-zA-Z0-9_]+$")
-
-# this is actually very forgiving, but accounts for the max like: stage.2.phase.2.job.2
-maxLegalNodes = 6
-
-with open(dataFile) as f:
+with open(dataFile, 'r') as f:
     for l in f.read().splitlines():
         totalCount += 1
         nodeCount = 0
