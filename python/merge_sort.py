@@ -1,5 +1,6 @@
 def merge(left, right):
     result = []
+
     i = 0
     j = 0
     len_left = len(left)
@@ -19,6 +20,7 @@ def merge(left, right):
     return result
 
 def merge_sort(list):
+    # check for recursion exit criteria
     if len(list) < 2:
         return list # single elements are sorted!
 
@@ -26,4 +28,6 @@ def merge_sort(list):
     middle = len(list) / 2
     left = merge_sort(list[:middle])
     right = merge_sort(list[middle:])
+
+    # return the sorted result
     return merge(left, right)
