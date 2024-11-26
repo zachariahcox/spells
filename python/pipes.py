@@ -1,5 +1,5 @@
 '''
-Python framework to parse piped output
+read lines from stdin
 $> cat /path/to/some/file | python pipes.py
 '''
 import sys
