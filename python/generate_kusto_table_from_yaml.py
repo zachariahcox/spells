@@ -1,6 +1,8 @@
 """
 Generate kusto table from employee data.
 @zachariahcox
+
+usage: $ python generate_kusto_table_from_yaml.py <path to yaml file>
 """
 import os
 import sys
@@ -20,11 +22,19 @@ def load_org_chart(d):
         # we know the manager
         employee_to_manager[user] = manager
 
-        # find the employees
-        employees = manager_to_employees.get(manager)
+        # add this user to the employees of the manager
+        peers = manager_to_employees.get(manager)
+        if not peers:
+            manager_to_employees[manager] = peers = set()
+        peers.add(user)
+
+        # check if this user is a manager-type-person (important for managers who don't have direct reports atm)
+        employees = manager_to_employees.get(user)
         if not employees:
-            manager_to_employees[manager] = employees = set()
-        employees.add(user)
+            title = meta.get('title', "")
+            for honorific in ("Dir", "Mgr"):
+                if honorific in title:
+                    manager_to_employees[user] = set() # this is a manager-type-person, but they don't have any employees yet
 
     return manager_to_employees, employee_to_manager
 
