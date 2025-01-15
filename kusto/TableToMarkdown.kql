@@ -1,0 +1,24 @@
+// kudos to https://stackoverflow.com/questions/73783992/how-to-generate-a-markdown-from-a-kusto-adx-query-result
+let TableToMarkdown = (t: (*)) {
+    let schema = t | getschema;
+    let headers = schema
+        | project ColumnName
+        | summarize make_list(ColumnName)
+        | extend String = strcat('| ', strcat_array(list_ColumnName, ' | '), ' |')
+        | project String, Order=1;
+    let upperDivider = schema
+        | project ColumnName, Sep = '---'
+        | summarize Cols=make_list(Sep)
+        | extend String = strcat('| ', strcat_array(Cols, ' | '), ' |')
+        | project String, Order=2;
+    let data = t
+        | extend Cols=pack_array(*)
+        | extend String = strcat('| ', strcat_array(Cols, ' | '), ' |')
+        | project String, Order=3;
+    headers 
+    | union upperDivider
+    | union data
+    | order by Order asc 
+    | summarize Rows=make_list(String) 
+    | project array_strcat(Rows, '\r\n')
+};
