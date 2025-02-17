@@ -50,18 +50,17 @@ Insertion sort that the heap sort uses if the array size is small or if
 the size of the "run" is small
 """
 def insertion_sort(the_array):
-    l = len(the_array)
-    for index in range(1, l):
+    len_the_array = len(the_array)
+    for index in range(1, len_the_array):
         value = the_array[index]
         pos = binary_search(the_array, value, 0, index - 1)
         the_array = the_array[:pos] + [value] + the_array[pos:index] + the_array[index+1:]
     return the_array
 
 def merge(left, right):
-    """Takes two sorted lists and returns a single sorted list by comparing the
+    """
+    Takes two sorted lists and returns a single sorted list by comparing the
     elements one at a time.
-
-    [1, 2, 3, 4, 5, 6]
     """
     if not left:
         return right
@@ -69,7 +68,8 @@ def merge(left, right):
         return left
     if left[0] < right[0]:
         return [left[0]] + merge(left[1:], right)
-    return [right[0]] + merge(left, right[1:])
+    else:
+        return [right[0]] + merge(left, right[1:])
 
 
 def timsort(the_array):
@@ -79,22 +79,29 @@ def timsort(the_array):
     # split array into "runs"
     # a run is a subset of monotonically increasing values
     #
-    l = len(the_array)
-    new_run = [the_array[0]]
-    for i in range(1, l):
-        if i == l-1:
+    len_the_array = len(the_array)
+    new_run = [the_array[0]] # a new array with just the first element of the input
+    for i in range(1, len_the_array):
+
+        # exit
+        if i == len_the_array - 1:
+            # found the end!
             new_run.append(the_array[i])
             runs.append(new_run)
             break
 
         if the_array[i] < the_array[i-1]:
+            # i is not monotonically increasing
+            #   break the run
             if not new_run:
-                runs.append([the_array[i-1]])
-                new_run.append(the_array[i])
+                runs.append([the_array[i-1]]) # i-1 was a run of one, don't bother adding it to the new_run
+                new_run.append(the_array[i])  # start new run
             else:
+                # new run has at least one element, so add it to the runs
                 runs.append(new_run)
-                new_run = []
+                new_run = [] # todo: should this be the the_array[i]?
         else:
+            # i is monotonically increasing, so add to the run
             new_run.append(the_array[i])
 
     #
