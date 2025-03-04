@@ -9,8 +9,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"syscall"
 
 	"golang.org/x/crypto/scrypt"
+	"golang.org/x/term"
 )
 
 func encryptFile(filename, encrypted_file_name, password string) error {
@@ -235,127 +238,63 @@ func unzipFolder(zipFileName, folder string) error {
 	return nil
 }
 
-func main() {
-	password := "mysecretpassword"
-	testFolder := "test_folder"
-	cleanupFiles := []string{
-		testFolder,
-		testFolder + "_unzipped",
-		testFolder + ".zip",
-		testFolder + ".zip.enc",
-		testFolder + "_decrypted.zip",
+func getPassword(prompt string) (string, error) {
+	fmt.Print(prompt)
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		return "", err
 	}
-	defer func() {
-		for _, file := range cleanupFiles {
-			if err := os.RemoveAll(file); err != nil {
-				fmt.Println("Error deleting", file, ":", err)
-			}
-		}
-	}()
-
-	// delete any cleanup files if they exist
-	for _, file := range cleanupFiles {
-		if _, err := os.Stat(file); err == nil {
-			if err := os.RemoveAll(file); err != nil {
-				fmt.Println("Error deleting", file, ":", err)
-			}
-		} else if !os.IsNotExist(err) {
-			fmt.Println("Error checking file", file, ":", err)
-		}
-	}
-
-	// Create a folder of test files
-	if err := os.Mkdir(testFolder, 0755); err != nil {
-		fmt.Println("Error creating test folder:", err)
-		os.Exit(1)
-	}
-
-	// Create some dummy files in the folder
-	for i := 1; i <= 3; i++ {
-		if err := os.WriteFile(filepath.Join(testFolder, fmt.Sprintf("file%d.txt", i)), []byte(fmt.Sprintf("This is the content of file %d.", i)), 0644); err != nil {
-			fmt.Println("Error creating test file:", err)
-			os.Exit(1)
-		}
-	}
-
-	// Create a zip file of that folder
-	zipFileName := testFolder + ".zip"
-	if err := zipFolder(testFolder, zipFileName); err != nil {
-		fmt.Println("Error zipping folder:", err)
-		os.Exit(1)
-	}
-
-	// Encrypt the zip file with the password
-	if err := encryptFile(zipFileName, zipFileName+".enc", password); err != nil {
-		fmt.Println("Error encrypting zip file:", err)
-		os.Exit(1)
-	}
-
-	// Decrypt the zip file with the password
-	if err := decryptFile(zipFileName+".enc", testFolder+"_decrypted.zip", password); err != nil {
-		fmt.Println("Error decrypting zip file:", err)
-		os.Exit(1)
-	}
-
-	// Unzip the zip file
-	if err := unzipFolder(testFolder+"_decrypted.zip", testFolder+"_unzipped"); err != nil {
-		fmt.Println("Error unzipping folder:", err)
-		os.Exit(1)
-	}
-
-	// Verify the contents of the unzipped folder
-	if err := verifyFolderContents(testFolder, testFolder+"_unzipped/"+testFolder); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	fmt.Println("All tests passed successfully.")
+	fmt.Println() // Add a newline after reading the password
+	return string(bytePassword), nil
 }
 
-func verifyFolderContents(originalFolder, unzippedFolder string) error {
-	originalFiles, err := filepath.Glob(filepath.Join(originalFolder, "*"))
+func main() {
+	// action verbs
+	encrypt := "e"
+	decrypt := "d"
+
+	// get args
+	args := os.Args[1:]
+	if len(args) != 2 {
+		fmt.Println("Usage: zcrypt [" + encrypt + "," + decrypt + "] <filename>")
+		os.Exit(1)
+	}
+
+	action := args[0]
+	filename := args[1]
+	if action != encrypt && action != decrypt {
+		fmt.Println("Invalid action. Use '" + encrypt + "' or '" + decrypt + "'.")
+		os.Exit(1)
+	}
+	_, err := os.Stat(filename)
 	if err != nil {
-		return fmt.Errorf("error reading original folder: %v", err)
+		fmt.Println("File does not exist:", filename)
+		os.Exit(1)
 	}
 
-	unzippedFiles, err := filepath.Glob(filepath.Join(unzippedFolder, "*"))
+	password, err := getPassword("Enter password: ")
 	if err != nil {
-		return fmt.Errorf("error reading unzipped folder: %v", err)
+		fmt.Println("Error reading password:", err)
+		os.Exit(1)
 	}
 
-	if len(originalFiles) != len(unzippedFiles) {
-		return fmt.Errorf("error: number of files in original and unzipped folders do not match")
+	if action == encrypt {
+		output := filename + ".enc"
+		if err := encryptFile(filename, output, password); err != nil {
+			fmt.Println("Error encrypting file:", err)
+			os.Exit(1)
+		}
+		fmt.Println("File encrypted successfully:", output)
+	} else if action == decrypt {
+		if !strings.HasSuffix(filename, ".enc") {
+			fmt.Println("File is not encrypted. Please provide a file with .enc extension.")
+			os.Exit(1)
+		}
+		output := strings.TrimSuffix(filename, ".enc")
+		if err := decryptFile(filename, output, password); err != nil {
+			fmt.Println("Error decrypting file:", err)
+			os.Exit(1)
+		}
+		fmt.Println("File decrypted successfully:", output)
 	}
-
-	for i, originalFile := range originalFiles {
-		originalInfo, err := os.Stat(originalFile)
-		if err != nil {
-			return fmt.Errorf("error stating original file: %v", err)
-		}
-
-		unzippedInfo, err := os.Stat(unzippedFiles[i])
-		if err != nil {
-			return fmt.Errorf("error stating unzipped file: %v", err)
-		}
-
-		if originalInfo.Mode() != unzippedInfo.Mode() {
-			return fmt.Errorf("error: file permissions do not match for %s", originalFile)
-		}
-
-		originalContent, err := os.ReadFile(originalFile)
-		if err != nil {
-			return fmt.Errorf("error reading original file: %v", err)
-		}
-
-		unzippedContent, err := os.ReadFile(unzippedFiles[i])
-		if err != nil {
-			return fmt.Errorf("error reading unzipped file: %v", err)
-		}
-
-		if string(originalContent) != string(unzippedContent) {
-			return fmt.Errorf("error: file contents do not match for %s", originalFile)
-		}
-	}
-
-	return nil
 }

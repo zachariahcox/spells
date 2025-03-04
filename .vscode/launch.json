@@ -5,6 +5,13 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch file",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${file}"
+        },
+        {
             "name": "py: with args",
             "type": "debugpy",
             "request": "launch",
@@ -25,15 +32,6 @@
             ]
         },
         // run this file golang file with the debugger
-        {
-            "name": "Go: debug file",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            "program": "${file}",
-            "env": {},
-            "args": []
-        },
         {
             "name": "cli-module-debug",
             "type": "debugpy",
