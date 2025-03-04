@@ -16,6 +16,11 @@ import (
 	"golang.org/x/term"
 )
 
+// config for scrypt
+const scrypt_N = 1048576 // 2**20
+const scrypt_nonce = 12
+const scrypt_salt = 32
+
 func encryptFile(filename, encrypted_file_name, password string) error {
 	// Read contents to be encrypted
 	plain_text, err := os.ReadFile(filename)
@@ -23,12 +28,14 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 		return err
 	}
 
-	salt := make([]byte, 32)
+	// salt should be randomly generated and at least 16 bytes
+	salt := make([]byte, scrypt_salt)
 	if _, err := rand.Read(salt); err != nil {
 		return err
 	}
 
-	key, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	// aes-256bit has a 32byte derived key length settings
+	key, err := scrypt.Key([]byte(password), salt, scrypt_N, 8, 1, 32)
 	if err != nil {
 		return err
 	}
@@ -43,7 +50,7 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 		return err
 	}
 
-	nonce := make([]byte, aesgcm.NonceSize())
+	nonce := make([]byte, scrypt_nonce)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return err
 	}
@@ -80,12 +87,11 @@ func decryptFile(encrypted_file_name, decrypted_file_name, password string) erro
 		return err
 	}
 
-	// Extract the salt, nonce, and ciphertext
-	salt := encrypted_data[:32]
-	nonce := encrypted_data[32 : 32+12]
-	cipher_text := encrypted_data[32+12:]
-
-	key, err := scrypt.Key([]byte(password), salt, 32768, 8, 1, 32)
+	// Extract the salt, nonce, and cipher_text
+	salt := encrypted_data[:scrypt_salt]
+	nonce := encrypted_data[scrypt_salt : scrypt_salt+scrypt_nonce]
+	cipher_text := encrypted_data[scrypt_salt+scrypt_nonce:]
+	key, err := scrypt.Key([]byte(password), salt, scrypt_N, 8, 1, 32)
 	if err != nil {
 		return err
 	}
