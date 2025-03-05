@@ -7,8 +7,10 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -255,52 +257,70 @@ func getPassword(prompt string) (string, error) {
 }
 
 func main() {
-	// action verbs
+	// verbs
 	encrypt := "e"
 	decrypt := "d"
+	compress := "z"
+	uncompress := "u"
+	verbs := []string{encrypt, decrypt, compress, uncompress}
 
 	// get args
 	args := os.Args[1:]
 	if len(args) != 2 {
-		fmt.Println("Usage: zcrypt [" + encrypt + "," + decrypt + "] <filename>")
-		os.Exit(1)
+		log.Fatalf("Usage: zcrypt [%s] <filename>", strings.Join(verbs, ", "))
 	}
 
 	action := args[0]
 	filename := args[1]
-	if action != encrypt && action != decrypt {
-		fmt.Println("Invalid action. Use '" + encrypt + "' or '" + decrypt + "'.")
-		os.Exit(1)
+	if !slices.Contains(verbs, action) {
+		log.Fatalf("Invalid action. Use '%s' or '%s'.", encrypt, decrypt)
 	}
 	_, err := os.Stat(filename)
 	if err != nil {
-		fmt.Println("File does not exist:", filename)
-		os.Exit(1)
+		log.Fatalf("File does not exist: %s", filename)
 	}
 
 	password, err := getPassword("Enter password: ")
 	if err != nil {
-		fmt.Println("Error reading password:", err)
-		os.Exit(1)
+		log.Fatalf("Error reading password: %v", err)
 	}
 
-	if action == encrypt {
+	switch action {
+	case compress:
+		output := filename + ".zip"
+		if err := zipFolder(filename, output); err != nil {
+			log.Fatalf("Error zipping folder: %v", err)
+		}
+		if err := encryptFile(output, output+".enc", password); err != nil {
+			log.Fatalf("Error encrypting zip file: %v", err)
+		}
+		fmt.Println("Folder zipped and encrypted successfully:", output+".enc")
+
+	case uncompress:
+		if !strings.HasSuffix(filename, ".zip") {
+			log.Fatalf("File is not a zip file. Please provide a file with .zip extension.")
+		}
+		output := strings.TrimSuffix(filename, ".zip")
+		if err := unzipFolder(filename, output); err != nil {
+			log.Fatalf("Error unzipping file: %v", err)
+		}
+		fmt.Println("File unzipped successfully:", output)
+	case encrypt:
 		output := filename + ".enc"
 		if err := encryptFile(filename, output, password); err != nil {
-			fmt.Println("Error encrypting file:", err)
-			os.Exit(1)
+			log.Fatalf("Error encrypting file: %v", err)
 		}
 		fmt.Println("File encrypted successfully:", output)
-	} else if action == decrypt {
+	case decrypt:
 		if !strings.HasSuffix(filename, ".enc") {
-			fmt.Println("File is not encrypted. Please provide a file with .enc extension.")
-			os.Exit(1)
+			log.Fatalf("File is not encrypted. Please provide a file with .enc extension.")
 		}
 		output := strings.TrimSuffix(filename, ".enc")
 		if err := decryptFile(filename, output, password); err != nil {
-			fmt.Println("Error decrypting file:", err)
-			os.Exit(1)
+			log.Fatalf("Error decrypting file: %v", err)
 		}
 		fmt.Println("File decrypted successfully:", output)
+	default:
+		log.Fatalf("Invalid action. Use '%s' or '%s'.", encrypt, decrypt)
 	}
 }
