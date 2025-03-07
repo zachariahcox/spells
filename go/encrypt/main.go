@@ -286,7 +286,8 @@ func main() {
 	// get args
 	args := os.Args[1:]
 	if len(args) != 2 {
-		log.Fatalf("Usage: zcrypt [%s] <filename>", strings.Join(verbs, ", "))
+		log.Printf("Usage: zcrypt [%s] <filename>", strings.Join(verbs, ", "))
+		os.Exit(1)
 	}
 
 	action := args[0]

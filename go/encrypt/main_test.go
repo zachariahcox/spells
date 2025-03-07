@@ -7,6 +7,124 @@ import (
 	"testing"
 )
 
+// test just encrypting and decrypting a file
+func TestEncryptAndDecrypt(t *testing.T) {
+	password := "mysecretpassword"
+	testFile := "test.txt"
+	encryptedFile := "test.txt.enc"
+	decryptedFile := "test_decrypted.txt"
+
+	cleanupFiles := []string{
+		testFile,
+		encryptedFile,
+		decryptedFile,
+	}
+	defer cleanup(cleanupFiles)
+	cleanup(cleanupFiles)
+
+	// Create a test file
+	content := []byte("This is a test file.")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatalf("error creating test file: %v", err)
+	}
+
+	// Encrypt the test file
+	if err := encryptFile(testFile, encryptedFile, password); err != nil {
+		t.Fatalf("error encrypting test file: %v", err)
+	}
+
+	// Decrypt the encrypted file
+	if err := decryptFile(encryptedFile, decryptedFile, password); err != nil {
+		t.Fatalf("error decrypting test file: %v", err)
+	}
+
+	// Verify the contents of the decrypted file
+	decryptedContent, err := os.ReadFile(decryptedFile)
+	if err != nil {
+		t.Fatalf("error reading decrypted file: %v", err)
+	}
+
+	if string(decryptedContent) != string(content) {
+		t.Fatalf("error: decrypted content does not match original content")
+	}
+}
+
+func TestZip(t *testing.T) {
+	testFolder := "test_folder"
+	zipFileName := testFolder + ".zip"
+	unzipFolderName := testFolder + "_unzipped"
+
+	cleanupFiles := []string{
+		testFolder,
+		unzipFolderName,
+		zipFileName,
+	}
+	defer cleanup(cleanupFiles)
+	cleanup(cleanupFiles)
+
+	// Create some dummy files in the folder
+	generateTestFiles(testFolder, 5)
+
+	// Create a zip file of that folder
+	if err := zipFolder(testFolder, zipFileName); err != nil {
+		t.Fatalf("error zipping folder: %v", err)
+	}
+
+	// Unzip the zip file
+	if err := unzipFolder(zipFileName, unzipFolderName); err != nil {
+		t.Fatalf("error unzipping folder: %v", err)
+	}
+
+	// Verify the contents of the unzipped folder
+	if err := verifyFolderContents(testFolder, unzipFolderName+"/"+testFolder); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestZipAndEncrypt(t *testing.T) {
+	password := "mysecretpassword"
+	testFolder := "test_folder"
+
+	cleanupFiles := []string{
+		testFolder,
+		testFolder + "_unzipped",
+		testFolder + ".zip",
+		testFolder + ".zip.enc",
+		testFolder + "_decrypted.zip",
+	}
+	defer cleanup(cleanupFiles)
+	cleanup(cleanupFiles)
+
+	// Create some dummy files in the folder
+	generateTestFiles(testFolder, 5)
+
+	// Create a zip file of that folder
+	zipFileName := testFolder + ".zip"
+	if err := zipFolder(testFolder, zipFileName); err != nil {
+		t.Fatalf("Error zipping folder: %v", err)
+	}
+
+	// Encrypt the zip file with the password
+	if err := encryptFile(zipFileName, zipFileName+".enc", password); err != nil {
+		t.Fatalf("Error encrypting zip file: %v", err)
+	}
+
+	// Decrypt the zip file with the password
+	if err := decryptFile(zipFileName+".enc", testFolder+"_decrypted.zip", password); err != nil {
+		t.Fatalf("Error decrypting zip file: %v", err)
+	}
+
+	// Unzip the zip file
+	if err := unzipFolder(testFolder+"_decrypted.zip", testFolder+"_unzipped"); err != nil {
+		t.Fatalf("Error unzipping folder: %v", err)
+	}
+
+	// Verify the contents of the unzipped folder
+	if err := verifyFolderContents(testFolder, testFolder+"_unzipped/"+testFolder); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
 func verifyFolderContents(originalFolder, unzippedFolder string) error {
 	originalFiles, err := filepath.Glob(filepath.Join(originalFolder, "*"))
 	if err != nil {
@@ -72,99 +190,14 @@ func cleanup(cleanupFiles []string) {
 	}
 }
 
-// test just encrypting and decrypting a file
-func TestEncryptAndDecrypt(t *testing.T) {
-	password := "mysecretpassword"
-	testFile := "test.txt"
-	encryptedFile := "test.txt.enc"
-	decryptedFile := "test_decrypted.txt"
-
-	cleanupFiles := []string{
-		testFile,
-		encryptedFile,
-		decryptedFile,
-	}
-	defer cleanup(cleanupFiles)
-	cleanup(cleanupFiles)
-
-	// Create a test file
-	content := []byte("This is a test file.")
-	if err := os.WriteFile(testFile, content, 0644); err != nil {
-		t.Fatalf("error creating test file: %v", err)
-	}
-
-	// Encrypt the test file
-	if err := encryptFile(testFile, encryptedFile, password); err != nil {
-		t.Fatalf("error encrypting test file: %v", err)
-	}
-
-	// Decrypt the encrypted file
-	if err := decryptFile(encryptedFile, decryptedFile, password); err != nil {
-		t.Fatalf("error decrypting test file: %v", err)
-	}
-
-	// Verify the contents of the decrypted file
-	decryptedContent, err := os.ReadFile(decryptedFile)
-	if err != nil {
-		t.Fatalf("error reading decrypted file: %v", err)
-	}
-
-	if string(decryptedContent) != string(content) {
-		t.Fatalf("error: decrypted content does not match original content")
-	}
-
-	fmt.Println("Encryption and decryption tests passed successfully.")
-}
-
-func TestZipAndEncode(t *testing.T) {
-	password := "mysecretpassword"
-	testFolder := "f"
-
-	cleanupFiles := []string{
-		testFolder,
-		testFolder + "_unzipped",
-		testFolder + ".zip",
-		testFolder + ".zip.enc",
-		testFolder + "_decrypted.zip",
-	}
-	defer cleanup(cleanupFiles)
-	cleanup(cleanupFiles)
-
-	// Create some dummy files in the folder
-	for i := 1; i <= 3; i++ {
-		filepath := filepath.Join(testFolder, fmt.Sprintf("file%d.txt", i))
+// Create some dummy files in the folder
+func generateTestFiles(folder string, numFiles int) {
+	for i := 1; i <= numFiles; i++ {
+		filepath := filepath.Join(folder, fmt.Sprintf("file%d.txt", i))
 		content := fmt.Appendf(nil, "This is the content of file %d.", i)
-		os.MkdirAll(testFolder, os.ModePerm)
+		os.MkdirAll(folder, os.ModePerm)
 		if err := os.WriteFile(filepath, content, 0644); err != nil {
-			t.Fatalf("Error creating test file: %v", err)
+			fmt.Println("Error creating test file:", err)
 		}
 	}
-
-	// Create a zip file of that folder
-	zipFileName := testFolder + ".zip"
-	if err := zipFolder(testFolder, zipFileName); err != nil {
-		t.Fatalf("Error zipping folder: %v", err)
-	}
-
-	// Encrypt the zip file with the password
-	if err := encryptFile(zipFileName, zipFileName+".enc", password); err != nil {
-		t.Fatalf("Error encrypting zip file: %v", err)
-	}
-
-	// Decrypt the zip file with the password
-	if err := decryptFile(zipFileName+".enc", testFolder+"_decrypted.zip", password); err != nil {
-		t.Fatalf("Error decrypting zip file: %v", err)
-	}
-
-	// Unzip the zip file
-	if err := unzipFolder(testFolder+"_decrypted.zip", testFolder+"_unzipped"); err != nil {
-		t.Fatalf("Error unzipping folder: %v", err)
-	}
-
-	// Verify the contents of the unzipped folder
-	if err := verifyFolderContents(testFolder, testFolder+"_unzipped/"+testFolder); err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	fmt.Println("All tests passed successfully.")
 }
