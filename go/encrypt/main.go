@@ -20,8 +20,11 @@ import (
 
 // config for scrypt
 const scrypt_N = 1048576 // 2**20
+const scrypt_r = 8
+const scrypt_p = 1
 const scrypt_nonce = 12
 const scrypt_salt = 32
+const scrypt_key_len = 32 // aes-256bit has a 32byte derived key length
 
 func encryptFile(filename, encrypted_file_name, password string) error {
 	// Read contents to be encrypted
@@ -36,8 +39,13 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 		return err
 	}
 
-	// aes-256bit has a 32byte derived key length settings
-	key, err := scrypt.Key([]byte(password), salt, scrypt_N, 8, 1, 32)
+	key, err := scrypt.Key(
+		[]byte(password),
+		salt,
+		scrypt_N,
+		scrypt_r,
+		scrypt_p,
+		scrypt_key_len)
 	if err != nil {
 		return err
 	}
@@ -93,7 +101,13 @@ func decryptFile(encrypted_file_name, decrypted_file_name, password string) erro
 	salt := encrypted_data[:scrypt_salt]
 	nonce := encrypted_data[scrypt_salt : scrypt_salt+scrypt_nonce]
 	cipher_text := encrypted_data[scrypt_salt+scrypt_nonce:]
-	key, err := scrypt.Key([]byte(password), salt, scrypt_N, 8, 1, 32)
+	key, err := scrypt.Key(
+		[]byte(password),
+		salt,
+		scrypt_N,
+		scrypt_r,
+		scrypt_p,
+		scrypt_key_len)
 	if err != nil {
 		return err
 	}

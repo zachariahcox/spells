@@ -55,6 +55,67 @@ func verifyFolderContents(originalFolder, unzippedFolder string) error {
 	return nil
 }
 
+// cleanup function to remove test files after tests
+func cleanup(cleanupFiles []string) {
+	for _, file := range cleanupFiles {
+		if info, err := os.Stat(file); err == nil {
+			if info.IsDir() {
+				if err := os.RemoveAll(file); err != nil {
+					fmt.Println("Error deleting directory", file, ":", err)
+				}
+			} else if err := os.Remove(file); err != nil {
+				fmt.Println("Error deleting", file, ":", err)
+			}
+		} else if !os.IsNotExist(err) {
+			fmt.Println("Error checking file", file, ":", err)
+		}
+	}
+}
+
+// test just encrypting and decrypting a file
+func TestEncryptAndDecrypt(t *testing.T) {
+	password := "mysecretpassword"
+	testFile := "test.txt"
+	encryptedFile := "test.txt.enc"
+	decryptedFile := "test_decrypted.txt"
+
+	cleanupFiles := []string{
+		testFile,
+		encryptedFile,
+		decryptedFile,
+	}
+	defer cleanup(cleanupFiles)
+	cleanup(cleanupFiles)
+
+	// Create a test file
+	content := []byte("This is a test file.")
+	if err := os.WriteFile(testFile, content, 0644); err != nil {
+		t.Fatalf("error creating test file: %v", err)
+	}
+
+	// Encrypt the test file
+	if err := encryptFile(testFile, encryptedFile, password); err != nil {
+		t.Fatalf("error encrypting test file: %v", err)
+	}
+
+	// Decrypt the encrypted file
+	if err := decryptFile(encryptedFile, decryptedFile, password); err != nil {
+		t.Fatalf("error decrypting test file: %v", err)
+	}
+
+	// Verify the contents of the decrypted file
+	decryptedContent, err := os.ReadFile(decryptedFile)
+	if err != nil {
+		t.Fatalf("error reading decrypted file: %v", err)
+	}
+
+	if string(decryptedContent) != string(content) {
+		t.Fatalf("error: decrypted content does not match original content")
+	}
+
+	fmt.Println("Encryption and decryption tests passed successfully.")
+}
+
 func TestZipAndEncode(t *testing.T) {
 	password := "mysecretpassword"
 	testFolder := "f"
@@ -66,21 +127,8 @@ func TestZipAndEncode(t *testing.T) {
 		testFolder + ".zip.enc",
 		testFolder + "_decrypted.zip",
 	}
-	cleanup := func() {
-		for _, file := range cleanupFiles {
-			if _, err := os.Stat(file); err == nil {
-				if err := os.RemoveAll(file); err != nil {
-					fmt.Println("Error deleting", file, ":", err)
-				}
-			} else if !os.IsNotExist(err) {
-				fmt.Println("Error checking file", file, ":", err)
-			}
-		}
-	}
-	defer cleanup()
-
-	// Clean up any existing files from previous runs
-	cleanup()
+	defer cleanup(cleanupFiles)
+	cleanup(cleanupFiles)
 
 	// Create some dummy files in the folder
 	for i := 1; i <= 3; i++ {
@@ -88,40 +136,34 @@ func TestZipAndEncode(t *testing.T) {
 		content := fmt.Appendf(nil, "This is the content of file %d.", i)
 		os.MkdirAll(testFolder, os.ModePerm)
 		if err := os.WriteFile(filepath, content, 0644); err != nil {
-			fmt.Println("Error creating test file:", err)
-			os.Exit(1)
+			t.Fatalf("Error creating test file: %v", err)
 		}
 	}
 
 	// Create a zip file of that folder
 	zipFileName := testFolder + ".zip"
 	if err := zipFolder(testFolder, zipFileName); err != nil {
-		fmt.Println("Error zipping folder:", err)
-		os.Exit(1)
+		t.Fatalf("Error zipping folder: %v", err)
 	}
 
 	// Encrypt the zip file with the password
 	if err := encryptFile(zipFileName, zipFileName+".enc", password); err != nil {
-		fmt.Println("Error encrypting zip file:", err)
-		os.Exit(1)
+		t.Fatalf("Error encrypting zip file: %v", err)
 	}
 
 	// Decrypt the zip file with the password
 	if err := decryptFile(zipFileName+".enc", testFolder+"_decrypted.zip", password); err != nil {
-		fmt.Println("Error decrypting zip file:", err)
-		os.Exit(1)
+		t.Fatalf("Error decrypting zip file: %v", err)
 	}
 
 	// Unzip the zip file
 	if err := unzipFolder(testFolder+"_decrypted.zip", testFolder+"_unzipped"); err != nil {
-		fmt.Println("Error unzipping folder:", err)
-		os.Exit(1)
+		t.Fatalf("Error unzipping folder: %v", err)
 	}
 
 	// Verify the contents of the unzipped folder
 	if err := verifyFolderContents(testFolder, testFolder+"_unzipped/"+testFolder); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		t.Fatalf("%v", err)
 	}
 
 	fmt.Println("All tests passed successfully.")
