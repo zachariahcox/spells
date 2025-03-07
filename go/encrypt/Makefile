@@ -1,11 +1,11 @@
-GIT_TAG?= $(shell git describe --always --tags)
+# metadata
+BINARY_NAME := zc
 DATE_FMT=+%Y-%m-%d
+VERSION := $(shell git rev-parse --short HEAD)
 BUILD_DATE ?= $(shell date "$(DATE_FMT)")
-BUILD_FLAGS := "-w -s -X 'main.Version=$(GIT_TAG)' -X 'main.GitTag=$(GIT_TAG)' -X 'main.BuildDate=$(BUILD_DATE)'"
+BUILD_FLAGS := "-w -s -X 'main.Version=$(VERSION)' -X 'main.BuildDate=$(BUILD_DATE)'"
 BUILD_DIR := $(CURDIR)/build
 INSTALL_DIR := ~
-
-BINARY_NAME := zcrypt
 
 # build these rules even if files with the same name exist.
 .PHONY: build clean test install uninstall

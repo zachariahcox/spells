@@ -22,9 +22,19 @@ import (
 const scrypt_N = 1048576 // 2**20
 const scrypt_r = 8
 const scrypt_p = 1
-const scrypt_nonce = 12
-const scrypt_salt = 32
+const scrypt_nonce_len = 12
+const scrypt_salt_len = 32
 const scrypt_key_len = 32 // aes-256bit has a 32byte derived key length
+
+func getPassword(prompt string) (string, error) {
+	fmt.Print(prompt)
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		return "", err
+	}
+	fmt.Println() // Add a newline after reading the password
+	return string(bytePassword), nil
+}
 
 func encryptFile(filename, encrypted_file_name, password string) error {
 	// Read contents to be encrypted
@@ -33,12 +43,13 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 		return err
 	}
 
-	// salt should be randomly generated and at least 16 bytes
-	salt := make([]byte, scrypt_salt)
+	// generate random salt
+	salt := make([]byte, scrypt_salt_len)
 	if _, err := rand.Read(salt); err != nil {
 		return err
 	}
 
+	// derive key from password and salt
 	key, err := scrypt.Key(
 		[]byte(password),
 		salt,
@@ -46,10 +57,12 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 		scrypt_r,
 		scrypt_p,
 		scrypt_key_len)
+
 	if err != nil {
 		return err
 	}
 
+	// create cipher block
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
@@ -60,7 +73,8 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 		return err
 	}
 
-	nonce := make([]byte, scrypt_nonce)
+	// generate random nonce
+	nonce := make([]byte, scrypt_nonce_len)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return err
 	}
@@ -98,9 +112,9 @@ func decryptFile(encrypted_file_name, decrypted_file_name, password string) erro
 	}
 
 	// Extract the salt, nonce, and cipher_text
-	salt := encrypted_data[:scrypt_salt]
-	nonce := encrypted_data[scrypt_salt : scrypt_salt+scrypt_nonce]
-	cipher_text := encrypted_data[scrypt_salt+scrypt_nonce:]
+	salt := encrypted_data[:scrypt_salt_len]
+	nonce := encrypted_data[scrypt_salt_len : scrypt_salt_len+scrypt_nonce_len]
+	cipher_text := encrypted_data[scrypt_salt_len+scrypt_nonce_len:]
 	key, err := scrypt.Key(
 		[]byte(password),
 		salt,
@@ -122,6 +136,7 @@ func decryptFile(encrypted_file_name, decrypted_file_name, password string) erro
 		return err
 	}
 
+	// Decrypt the cipher text
 	plain_text, err := aesgcm.Open(nil, nonce, cipher_text, nil)
 	if err != nil {
 		return err
@@ -137,6 +152,7 @@ func decryptFile(encrypted_file_name, decrypted_file_name, password string) erro
 }
 
 func zipFolder(folder string, zipFileName string) error {
+	// Create output file
 	zipFile, err := os.Create(zipFileName)
 	if err != nil {
 		return err
@@ -216,7 +232,6 @@ func unzipFolder(zipFileName, folder string) error {
 	if err != nil {
 		return err
 	}
-
 	zipReader, err := zip.NewReader(zipFile, stat.Size())
 	if err != nil {
 		return err
@@ -258,16 +273,6 @@ func unzipFolder(zipFileName, folder string) error {
 	}
 
 	return nil
-}
-
-func getPassword(prompt string) (string, error) {
-	fmt.Print(prompt)
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		return "", err
-	}
-	fmt.Println() // Add a newline after reading the password
-	return string(bytePassword), nil
 }
 
 func main() {
