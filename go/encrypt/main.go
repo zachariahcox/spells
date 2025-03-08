@@ -10,15 +10,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
-	"syscall"
 
 	"golang.org/x/crypto/scrypt"
 	"golang.org/x/term"
 )
 
 // config for scrypt
+const tool_name = "zc"
 const scrypt_N = 1048576 // 2**20
 const scrypt_r = 8
 const scrypt_p = 1
@@ -26,17 +25,27 @@ const scrypt_nonce_len = 12
 const scrypt_salt_len = 32
 const scrypt_key_len = 32 // aes-256bit has a 32byte derived key length
 
-func getPassword(prompt string) (string, error) {
+func getPassword(prompt string) ([]byte, error) {
+	// this function is used to read a password from the terminal
+	// it uses the term package to read the password without echoing it
+	// it returns the password as a byte slice.
+	// this byte slice must be zeroed out after use!
+
 	fmt.Print(prompt)
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	pwd, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	fmt.Println() // Add a newline after reading the password
-	return string(bytePassword), nil
+	return pwd, nil
+}
+func zeroBytes(bytes []byte) {
+	for i := range bytes {
+		bytes[i] = 0
+	}
 }
 
-func encryptFile(filename, encrypted_file_name, password string) error {
+func encryptFile(filename string, encrypted_file_name string, password []byte) error {
 	// Read contents to be encrypted
 	plain_text, err := os.ReadFile(filename)
 	if err != nil {
@@ -51,7 +60,7 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 
 	// derive key from password and salt
 	key, err := scrypt.Key(
-		[]byte(password),
+		password,
 		salt,
 		scrypt_N,
 		scrypt_r,
@@ -61,6 +70,8 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 	if err != nil {
 		return err
 	}
+	defer zeroBytes(key)
+	defer zeroBytes(salt)
 
 	// create cipher block
 	block, err := aes.NewCipher(key)
@@ -104,19 +115,20 @@ func encryptFile(filename, encrypted_file_name, password string) error {
 	return nil
 }
 
-func decryptFile(encrypted_file_name, decrypted_file_name, password string) error {
+func decryptFile(encrypted_file_name string, decrypted_file_name string, password []byte) error {
 	// Read the encrypted file
 	encrypted_data, err := os.ReadFile(encrypted_file_name)
 	if err != nil {
 		return err
 	}
+	defer zeroBytes(encrypted_data)
 
 	// Extract the salt, nonce, and cipher_text
 	salt := encrypted_data[:scrypt_salt_len]
 	nonce := encrypted_data[scrypt_salt_len : scrypt_salt_len+scrypt_nonce_len]
 	cipher_text := encrypted_data[scrypt_salt_len+scrypt_nonce_len:]
 	key, err := scrypt.Key(
-		[]byte(password),
+		password,
 		salt,
 		scrypt_N,
 		scrypt_r,
@@ -125,12 +137,14 @@ func decryptFile(encrypted_file_name, decrypted_file_name, password string) erro
 	if err != nil {
 		return err
 	}
+	defer zeroBytes(key)
+	defer zeroBytes(salt)
 
+	// Create a cipher block
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return err
 	}
-
 	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return err
@@ -139,8 +153,13 @@ func decryptFile(encrypted_file_name, decrypted_file_name, password string) erro
 	// Decrypt the cipher text
 	plain_text, err := aesgcm.Open(nil, nonce, cipher_text, nil)
 	if err != nil {
+		// if the password is wrong, the error will be "cipher: message authentication failed"
+		if err.Error() == "cipher: message authentication failed" {
+			return fmt.Errorf("decryption failed: invalid password or corrupted file")
+		}
 		return err
 	}
+	defer zeroBytes(plain_text)
 
 	// Write the decrypted data to the output file
 	err = os.WriteFile(decrypted_file_name, plain_text, 0644)
@@ -241,6 +260,11 @@ func unzipFolder(zipFileName, folder string) error {
 	for _, file := range zipReader.File {
 		filePath := filepath.Join(folder, file.Name)
 
+		// fail if theres a path traversal attack (no escaping into parent directories)
+		if !strings.HasPrefix(filepath.Clean(filePath), filepath.Clean(folder)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid file path: %s", filePath)
+		}
+
 		if file.FileInfo().IsDir() {
 			// Create directories
 			os.MkdirAll(filePath, os.ModePerm)
@@ -275,72 +299,59 @@ func unzipFolder(zipFileName, folder string) error {
 	return nil
 }
 
-func main() {
-	// verbs
-	encrypt := "e"
-	decrypt := "d"
-	compress := "z"
-	uncompress := "u"
-	verbs := []string{encrypt, decrypt, compress, uncompress}
-
-	// get args
-	args := os.Args[1:]
-	if len(args) != 2 {
-		log.Printf("Usage: zcrypt [%s] <filename>", strings.Join(verbs, ", "))
+func cli(args []string) {
+	// check args
+	if len(args) != 1 {
+		fmt.Println("Usage:", tool_name, "<folder name or file that ends in .enc>")
 		os.Exit(1)
 	}
 
-	action := args[0]
-	filename := args[1]
-	if !slices.Contains(verbs, action) {
-		log.Fatalf("Invalid action. Use '%s' or '%s'.", encrypt, decrypt)
-	}
-	_, err := os.Stat(filename)
+	filename := args[0]
+	fileInfo, err := os.Stat(filename)
 	if err != nil {
 		log.Fatalf("File does not exist: %s", filename)
 	}
+	if !fileInfo.IsDir() && !strings.HasSuffix(filename, ".enc") {
+		log.Fatalf("File is not a directory or an encrypted file: %s", filename)
+	}
 
+	// make temp dir in the current directory to prevent leaks into the real temp dir
+	wd := filepath.Dir(filename)
+	temp, err := os.MkdirTemp(wd, "temp")
+	if err != nil {
+		log.Fatalf("Error creating temp directory: %v", err)
+	}
+	defer os.RemoveAll(temp) // clean up temp directory
+
+	// do the work!
 	password, err := getPassword("Enter password: ")
 	if err != nil {
 		log.Fatalf("Error reading password: %v", err)
 	}
+	defer zeroBytes(password)
 
-	switch action {
-	case compress:
-		output := filename + ".zip"
-		if err := zipFolder(filename, output); err != nil {
-			log.Fatalf("Error zipping folder: %v", err)
-		}
-		if err := encryptFile(output, output+".enc", password); err != nil {
-			log.Fatalf("Error encrypting zip file: %v", err)
-		}
-		fmt.Println("Folder zipped and encrypted successfully:", output+".enc")
-
-	case uncompress:
-		if !strings.HasSuffix(filename, ".zip") {
-			log.Fatalf("File is not a zip file. Please provide a file with .zip extension.")
-		}
-		output := strings.TrimSuffix(filename, ".zip")
-		if err := unzipFolder(filename, output); err != nil {
-			log.Fatalf("Error unzipping file: %v", err)
-		}
-		fmt.Println("File unzipped successfully:", output)
-	case encrypt:
-		output := filename + ".enc"
-		if err := encryptFile(filename, output, password); err != nil {
-			log.Fatalf("Error encrypting file: %v", err)
-		}
-		fmt.Println("File encrypted successfully:", output)
-	case decrypt:
-		if !strings.HasSuffix(filename, ".enc") {
-			log.Fatalf("File is not encrypted. Please provide a file with .enc extension.")
-		}
+	if strings.HasSuffix(filename, ".enc") {
+		// decrypt
 		output := strings.TrimSuffix(filename, ".enc")
-		if err := decryptFile(filename, output, password); err != nil {
+		zipFile := filepath.Join(temp, filepath.Base(output))
+		if err := decryptFile(filename, zipFile, password); err != nil {
 			log.Fatalf("Error decrypting file: %v", err)
 		}
-		fmt.Println("File decrypted successfully:", output)
-	default:
-		log.Fatalf("Invalid action. Use '%s' or '%s'.", encrypt, decrypt)
+		if err := unzipFolder(zipFile, wd); err != nil {
+			log.Fatalf("Error unzipping file: %v", err)
+		}
+	} else {
+		// seal
+		output := filename + ".enc"
+		zipFile := filepath.Join(temp, filepath.Base(output))
+		if err := zipFolder(filename, zipFile); err != nil {
+			log.Fatalf("Error zipping folder: %v", err)
+		}
+		if err := encryptFile(zipFile, output, password); err != nil {
+			log.Fatalf("Error encrypting file: %v", err)
+		}
 	}
+}
+func main() {
+	cli(os.Args[1:])
 }

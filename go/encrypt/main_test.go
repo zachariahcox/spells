@@ -7,9 +7,13 @@ import (
 	"testing"
 )
 
-// test just encrypting and decrypting a file
+// func TestCLI(t *testing.T) {
+// 	generateTestFiles("test_folder", 5)
+// 	work([]string{"test_folder"})
+// }
+
 func TestEncryptAndDecrypt(t *testing.T) {
-	password := "mysecretpassword"
+	password := []byte("mysecretpassword")
 	testFile := "test.txt"
 	encryptedFile := "test.txt.enc"
 	decryptedFile := "test_decrypted.txt"
@@ -82,7 +86,7 @@ func TestZip(t *testing.T) {
 }
 
 func TestZipAndEncrypt(t *testing.T) {
-	password := "mysecretpassword"
+	password := []byte("mysecretpassword")
 	testFolder := "test_folder"
 
 	cleanupFiles := []string{
