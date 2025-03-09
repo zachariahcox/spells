@@ -33,10 +33,15 @@ test:
 	CGO_ENABLED=0 go test -v ./...
 
 # build and install the binary
-install: build
+install:
 	mkdir -p $(INSTALL_DIR)/bin
-	cp $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_DIR)/bin/$(BINARY_NAME)
+	@os_arch=$$(go env GOOS)/$$(go env GOARCH); \
+		bin_suffix=$$(if [ "$$(go env GOOS)" = "windows" ]; then echo ".exe"; else echo ""; fi); \
+		cp $(BUILD_DIR)/$$os_arch/$(BINARY_NAME)$$bin_suffix $(INSTALL_DIR)/bin/$(BINARY_NAME)$$bin_suffix
 
 # uninstall the binary
 uninstall:
-	rm -f $(INSTALL_DIR)/bin/$(BINARY_NAME)
+	@local_bin_name=$(INSTALL_DIR)/bin/$(BINARY_NAME)$$(if [ "$$(go env GOOS)" = "windows" ]; then echo ".exe"; else echo ""; fi);\
+	echo "rm -f $$local_bin_name";\
+	rm -f $$local_bin_name
+

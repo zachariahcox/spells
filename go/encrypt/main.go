@@ -257,15 +257,15 @@ func unzipFolder(zipFileName, folder string) error {
 	}
 
 	// Extract files from the zip file into the specified folder
-	for _, file := range zipReader.File {
-		filePath := filepath.Join(folder, file.Name)
+	for _, zf := range zipReader.File {
+		filePath := filepath.Join(folder, zf.Name)
 
 		// fail if theres a path traversal attack (no escaping into parent directories)
 		if !strings.HasPrefix(filepath.Clean(filePath), filepath.Clean(folder)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid file path: %s", filePath)
+			return fmt.Errorf("%s is not located in %s", filePath, folder)
 		}
 
-		if file.FileInfo().IsDir() {
+		if zf.FileInfo().IsDir() {
 			// Create directories
 			os.MkdirAll(filePath, os.ModePerm)
 		} else {
@@ -274,12 +274,12 @@ func unzipFolder(zipFileName, folder string) error {
 				return err
 			}
 
-			outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.Mode())
+			outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zf.Mode())
 			if err != nil {
 				return err
 			}
 
-			rc, err := file.Open()
+			rc, err := zf.Open()
 			if err != nil {
 				return err
 			}
@@ -299,59 +299,70 @@ func unzipFolder(zipFileName, folder string) error {
 	return nil
 }
 
-func cli(args []string) {
+func cli(args []string) error {
 	// check args
 	if len(args) != 1 {
-		fmt.Println("Usage:", tool_name, "<folder name or file that ends in .enc>")
-		os.Exit(1)
+		return fmt.Errorf("Usage: %s <folder name or file that ends in .enc>", tool_name)
 	}
 
+	// argument must be a directory or a file that ends with .enc
 	filename := args[0]
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
-		log.Fatalf("File does not exist: %s", filename)
+		return fmt.Errorf("File does not exist: %s", filename)
 	}
 	if !fileInfo.IsDir() && !strings.HasSuffix(filename, ".enc") {
-		log.Fatalf("File is not a directory or an encrypted file: %s", filename)
+		return fmt.Errorf("File is not a directory or an encrypted file: %s", filename)
 	}
 
 	// make temp dir in the current directory to prevent leaks into the real temp dir
-	wd := filepath.Dir(filename)
+	wd, err := filepath.Abs(filepath.Dir(filename))
+	if err != nil {
+		return fmt.Errorf("Error getting current directory: %v", err)
+	}
 	temp, err := os.MkdirTemp(wd, "temp")
 	if err != nil {
-		log.Fatalf("Error creating temp directory: %v", err)
+		return fmt.Errorf("Error creating temp directory: %v", err)
 	}
 	defer os.RemoveAll(temp) // clean up temp directory
 
-	// do the work!
+	// collect password
 	password, err := getPassword("Enter password: ")
 	if err != nil {
-		log.Fatalf("Error reading password: %v", err)
+		return fmt.Errorf("Error reading password: %v", err)
 	}
 	defer zeroBytes(password)
 
+	// do the work
 	if strings.HasSuffix(filename, ".enc") {
-		// decrypt
+		log.Println("Decrypting file...")
 		output := strings.TrimSuffix(filename, ".enc")
 		zipFile := filepath.Join(temp, filepath.Base(output))
 		if err := decryptFile(filename, zipFile, password); err != nil {
-			log.Fatalf("Error decrypting file: %v", err)
+			return fmt.Errorf("Error decrypting file: %v", err)
 		}
+		log.Println("Unzipping file...")
 		if err := unzipFolder(zipFile, wd); err != nil {
-			log.Fatalf("Error unzipping file: %v", err)
+			return fmt.Errorf("Error unzipping file: %v", err)
 		}
 	} else {
 		// seal
+		log.Println("Zipping folder...")
 		output := filename + ".enc"
 		zipFile := filepath.Join(temp, filepath.Base(output))
 		if err := zipFolder(filename, zipFile); err != nil {
-			log.Fatalf("Error zipping folder: %v", err)
+			return fmt.Errorf("Error zipping folder: %v", err)
 		}
+		log.Println("Encrypting file...")
 		if err := encryptFile(zipFile, output, password); err != nil {
-			log.Fatalf("Error encrypting file: %v", err)
+			return fmt.Errorf("Error encrypting file: %v", err)
 		}
 	}
+	log.Println("Done!")
+	return nil
 }
 func main() {
-	cli(os.Args[1:])
+	if err := cli(os.Args[1:]); err != nil {
+		log.Fatal(err)
+	}
 }
