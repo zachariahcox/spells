@@ -38,6 +38,16 @@
             "request": "launch",
             "module": "cli.main",
             "args": ["test_name"]
+        },
+        {
+            "name": "Debug migrate-branch-protections.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/python/migrate-branch-protections.py",
+            "console": "integratedTerminal",
+            "env": {
+                "GITHUB_TOKEN": "${env:GITHUB_TOKEN}"
+            }
         }
     ]
 }

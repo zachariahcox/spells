@@ -18,6 +18,7 @@ import (
 
 // config for scrypt
 const tool_name = "zc"
+const tool_ext = ".enc"
 const scrypt_N = 1048576 // 2**20
 const scrypt_r = 8
 const scrypt_p = 1
@@ -312,7 +313,7 @@ func cli(args []string) error {
 		return fmt.Errorf("File does not exist: %s", filename)
 	}
 	if !fileInfo.IsDir() && !strings.HasSuffix(filename, ".enc") {
-		return fmt.Errorf("File is not a directory or an encrypted file: %s", filename)
+		return fmt.Errorf("File is not a directory, and doesn't have a '%s' extension: %s", filename, tool_ext)
 	}
 
 	// make temp dir in the current directory to prevent leaks into the real temp dir
