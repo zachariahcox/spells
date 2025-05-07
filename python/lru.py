@@ -1,8 +1,8 @@
 class Node(object):
     def __init__(self, k, v, p, n):
-        self.key = k
+        self.key = k # needed because we need to evict the tail from the cache eventually and need to know the keys that map to it.
         self.value = v
-        self.prev = p
+        self.prev = p # doubly linked becaues we add to front and pull from back
         self.next = n
 
 class LRUCache(object):
@@ -15,7 +15,6 @@ class LRUCache(object):
         self.head = None
         self.tail = None
         self.cap = capacity
-        self.size = 0
 
     def get(self, key):
         """
