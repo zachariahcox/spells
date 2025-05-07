@@ -9,6 +9,8 @@ def check_condition(graph, index):
 def neighbors(graph, index):
     """
     Return all the nodes reachable from the given index in the graph.
+    In this case, assume a "node" can "reach" nodes + and - the value of the node. 
+    It could easily be modeled with other "child" pointers.
     """
     value = graph[index]
     return [index + value, index - value]
