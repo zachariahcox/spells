@@ -48,7 +48,7 @@ class MyLinkedList(object):
             return self.addAtHead(val)
         
         node = self.head
-        for i in range(index-1):
+        for _ in range(index-1): # walk to the index before the target node
             node = node.next
         
         n = Node(val, node.next)
@@ -65,7 +65,7 @@ class MyLinkedList(object):
                 self.head = self.head.next
         else:
             node = self.head
-            for _ in range(index-1):
+            for _ in range(index-1): # walk to the index before the target node
                 node = node.next
                 if node is None:
                     return 
