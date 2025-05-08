@@ -15,7 +15,7 @@ def reverseOnlyLetters(s: str) -> str:
     #         o.append(c) # add the non-alpha character
 
     # classic two pointer solution
-    o = [c for c in s] # make an copy output buffer
+    o = [c for c in s] # make a copy output buffer
     while i <= j:
         # find next i from beginning
         ci = s[i]
