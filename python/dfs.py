@@ -36,6 +36,9 @@ def find_path(graph, visited, path, index) -> bool:
             path.pop() # didn't work!
     return False
 
+# is there a path to a node with value 0?
+# each node reaches two children. The value is the index offset left and right
+# eg: [3,1,2], the "1" node can reach indices 0 and 2. The 3 node has no children, the 2 has index 0 as a child.
 for graph, start, expected in [
     ([4,2,3,0,3,1,2], 5, [5, 4, 1, 3]),
     ([4,2,3,0,3,1,2], 0, [0, 4, 1, 3]),
