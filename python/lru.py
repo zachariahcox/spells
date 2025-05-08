@@ -1,3 +1,4 @@
+# basic idea is that you have both a hashmap and a doubly linked list.
 class Node(object):
     def __init__(self, k, v, p, n):
         self.key = k # needed because we need to evict the tail from the cache eventually and need to know the keys that map to it.
