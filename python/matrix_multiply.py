@@ -13,7 +13,7 @@ def matrix_multiply(A, B):
     
     # size of result
     # if A is NxM and B is IxJ, then M == I and the output will have N rows, J columns
-    # each element will be the vector dot produt of the A row and the B column
+    # each element will be the vector dot product of the A row and the B column
     output = [[0 for _ in range(colsB)] for _ in range(rowsA)] # init to zeros
 
     for r in range(rowsA):

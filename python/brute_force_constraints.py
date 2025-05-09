@@ -58,7 +58,7 @@ def solve_low_to_high_column_wise(solutions, board, x):
                 # MODIFIED: otherwise, add to list and keep looking for more.
                 solutions.append(deepcopy(board))
 
-            # recurse using this matrix as the new state -- if it leads to a solution``
+            # recurse using this matrix as the new state
             elif solve_low_to_high_column_wise(solutions, board, x + 1):
                 return True # return True if we only want to find one solution
 
