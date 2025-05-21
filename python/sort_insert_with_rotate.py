@@ -13,6 +13,7 @@ def insertion_sort(elements):
 
         # the value should be inserted between j and j+1
         # we will insert it _at_ j+1 and "slide" all elements from j+1 to i-1 to the right by 1
+        # this shift operation is pretty boring and _could_ be implemented with a raw std::memcopy for potential gains.
         elements[j+2 : i+1] = elements[j+1 : i]
         
         # elements[i] now equals the previous elements[i-1]
