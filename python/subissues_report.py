@@ -99,7 +99,7 @@ def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
             api_endpoint
         ]
         
-        print(f"Running: {' '.join(cmd)}")
+        print(f"  Running: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         sub_issues_data = json.loads(result.stdout)
         
@@ -159,7 +159,7 @@ def generate_report(issues: List[str]) -> None:
             sub_issues = get_sub_issues(repo, issue_number)
             all_sub_issues.extend(sub_issues)
             
-            print(f"Found {len(sub_issues)} sub-issues for {issue_url}")
+            print(f"  Found {len(sub_issues)} sub-issues for {issue_url}")
         except Exception as e:
             print(f"Error processing {issue_url}: {e}")
             # More detailed error output for debugging
@@ -169,7 +169,7 @@ def generate_report(issues: List[str]) -> None:
                 print(f"stderr: {e.stderr}")
     
     if not all_sub_issues:
-        print("\nNo sub-issues found.")
+        print("  No sub-issues found.")
         sys.exit(1)
     
     for issue in all_sub_issues:
