@@ -2,7 +2,7 @@
 import json
 import re
 import subprocess
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 import shutil
 import sys
 
@@ -12,8 +12,8 @@ status_labels = {
     "done": ":purple_circle:", 
     "on track": ":green_circle:", 
     "inactive": ":white_circle:", 
-    "high risk": ":red_circle:", 
     "at risk": ":yellow_circle:", 
+    "high risk": ":red_circle:", 
 }
 
 def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
@@ -24,6 +24,61 @@ def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
         issue_number = match.group(2)
         return repo, issue_number
     raise ValueError(f"Invalid GitHub issue URL: {issue_url}")
+
+def get_target_date_from_comments(repo: str, issue_number: str) -> Optional[str]:
+    """Extract Target Date from the most recent comment of an issue."""
+    try:
+        # Fetch comments for the issue using GitHub API
+        owner, repository = repo.split('/')
+        api_endpoint = f"/repos/{owner}/{repository}/issues/{issue_number}/comments"
+        cmd = [
+            "gh", "api", 
+            "-H", "Accept: application/vnd.github+json",
+            "-H", "X-GitHub-Api-Version: 2022-11-28",
+            "--paginate",
+            f"{api_endpoint}?sort=created&direction=desc&per_page=100"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Paginated results might come as arrays on separate lines
+        try:
+            content = result.stdout
+            # Handle case where output is multiple JSON arrays (one per page)
+            if content.strip().startswith('[') and '\n[' in content:
+                all_comments = []
+                for line in content.splitlines():
+                    if line.strip():
+                        page_comments = json.loads(line)
+                        if isinstance(page_comments, list):
+                            all_comments.extend(page_comments)
+                comments = all_comments
+            else:
+                comments = json.loads(content)
+        except json.JSONDecodeError as e:
+            print(f"Error parsing comments JSON: {e}")
+            comments = []
+        
+        # Sort comments by creation date (newest first)
+        comments.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        
+        # Look for Target Date in the HTML comments format - only in the most recent comment
+        target_date_pattern = r'<!-- data key="target_date" start -->\s*(.*?)\s*<!-- data end -->'
+        
+        # Check only the most recent comment if available
+        if comments:
+            body = comments[0].get("body", "")
+            match = re.search(target_date_pattern, body, re.DOTALL)
+            if match:
+                return match.group(1).strip()
+        
+        return None
+    except subprocess.CalledProcessError as e:
+        print(f"Error getting comments for {repo}#{issue_number}: {e}")
+        if hasattr(e, 'stderr'):
+            print(f"stderr: {e.stderr}")
+        return None
+    except json.JSONDecodeError:
+        print(f"Error decoding comments JSON for {repo}#{issue_number}")
+        return None
 
 def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
     """Get sub-issues using the GitHub Sub-issues API via gh CLI."""
@@ -65,6 +120,8 @@ def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
                 cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state"]
                 sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 detailed_sub_issue = json.loads(sub_result.stdout)
+                detailed_sub_issue["target_date"] = get_target_date_from_comments(sub_repo, sub_issue_number)
+                
                 sub_issues.append(detailed_sub_issue)
             else:
                 print(f"  - Warning: Incomplete sub-issue data: {sub_issue}")
@@ -108,14 +165,11 @@ def generate_report(issues: List[str]) -> None:
             # More detailed error output for debugging
             print(f"Exception type: {type(e).__name__}")
             print(f"Exception args: {e.args}")
-            if hasattr(e, 'stderr'):
+            if isinstance(e, subprocess.CalledProcessError) and hasattr(e, 'stderr'):
                 print(f"stderr: {e.stderr}")
     
     if not all_sub_issues:
-        print("\nNo sub-issues found. This might be because:")
-        print("1. The issues don't have any sub-issues")
-        print("2. You don't have access to the repositories")
-        print("3. The Sub-issues API isn't enabled for these repositories")
+        print("\nNo sub-issues found.")
         sys.exit(1)
     
     for issue in all_sub_issues:
@@ -130,8 +184,8 @@ def generate_report(issues: List[str]) -> None:
 
     # Print report in markdown format
     print("\n# Sub-Issues Report")
-    print("\n| status | issue ")
-    print("|---|:--|")
+    print("\n| status | issue | target date |")
+    print("|---|:--|:--|")
     
     for status in status_labels.keys():    
         for issue in all_sub_issues:
@@ -145,8 +199,11 @@ def generate_report(issues: List[str]) -> None:
             status_name = issue.get("status")
             status_with_emoji = f"{status_labels[status_name]} {status_name}"
             
+            # Get target date
+            target_date = issue.get("target_date", "?")
+            
             # Print the row
-            print(f"| {status_with_emoji} | {issue_link} | ")
+            print(f"| {status_with_emoji} | {issue_link} | {target_date} |")
 
 if __name__ == "__main__":
     try:
