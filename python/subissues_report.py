@@ -26,7 +26,7 @@ def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
     raise ValueError(f"Invalid GitHub issue URL: {issue_url}")
 
 def get_target_date_from_comments(repo: str, issue_number: str) -> Optional[str]:
-    """Extract Target Date from the most recent comment of an issue."""
+    """Extract Target Date from issue comments, searching from newest to oldest."""
     try:
         # Fetch comments for the issue using GitHub API
         owner, repository = repo.split('/')
@@ -60,12 +60,12 @@ def get_target_date_from_comments(repo: str, issue_number: str) -> Optional[str]
         # Sort comments by creation date (newest first)
         comments.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         
-        # Look for Target Date in the HTML comments format - only in the most recent comment
+        # Look for Target Date in the HTML comments format - search through all comments from newest to oldest
         target_date_pattern = r'<!-- data key="target_date" start -->\s*(.*?)\s*<!-- data end -->'
         
-        # Check only the most recent comment if available
-        if comments:
-            body = comments[0].get("body", "")
+        # Check all comments starting with the most recent one
+        for comment in comments:
+            body = comment.get("body", "")
             match = re.search(target_date_pattern, body, re.DOTALL)
             if match:
                 return match.group(1).strip()
