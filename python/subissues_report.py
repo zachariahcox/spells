@@ -5,9 +5,10 @@ import subprocess
 from typing import List, Dict, Tuple, Optional
 import shutil
 import sys
+import datetime
 
 
-# howie labels
+# standard status labels and some emojis for display
 status_labels = {
     "done": ":purple_circle:", 
     "on track": ":green_circle:", 
@@ -25,8 +26,14 @@ def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
         return repo, issue_number
     raise ValueError(f"Invalid GitHub issue URL: {issue_url}")
 
-def get_target_date_from_comments(repo: str, issue_number: str) -> Optional[str]:
-    """Extract Target Date from issue comments, searching from newest to oldest."""
+def get_target_date_from_comments(repo: str, issue_number: str) -> Tuple[Optional[str], Optional[str]]:
+    """Extract Target Date from issue comments, searching from newest to oldest.
+    
+    Returns:
+        A tuple (target_date, comment_created_at) where:
+        - target_date: The extracted target date or None if not found
+        - comment_created_at: The timestamp of the comment containing the target date or None if not found
+    """
     try:
         # Fetch comments for the issue using GitHub API
         owner, repository = repo.split('/')
@@ -68,17 +75,19 @@ def get_target_date_from_comments(repo: str, issue_number: str) -> Optional[str]
             body = comment.get("body", "")
             match = re.search(target_date_pattern, body, re.DOTALL)
             if match:
-                return match.group(1).strip()
+                target_date = match.group(1).strip()
+                comment_timestamp = comment.get("created_at")
+                return target_date, comment_timestamp
         
-        return None
+        return None, None
     except subprocess.CalledProcessError as e:
         print(f"Error getting comments for {repo}#{issue_number}: {e}")
         if hasattr(e, 'stderr'):
             print(f"stderr: {e.stderr}")
-        return None
+        return None, None
     except json.JSONDecodeError:
         print(f"Error decoding comments JSON for {repo}#{issue_number}")
-        return None
+        return None, None
 
 def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
     """Get sub-issues using the GitHub Sub-issues API via gh CLI."""
@@ -120,7 +129,9 @@ def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
                 cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state"]
                 sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 detailed_sub_issue = json.loads(sub_result.stdout)
-                detailed_sub_issue["target_date"] = get_target_date_from_comments(sub_repo, sub_issue_number)
+                target_date, comment_timestamp = get_target_date_from_comments(sub_repo, sub_issue_number)
+                detailed_sub_issue["target_date"] = target_date if target_date else "N/A"
+                detailed_sub_issue["last_updated_at"] = comment_timestamp if comment_timestamp else "N/A"
                 
                 sub_issues.append(detailed_sub_issue)
             else:
@@ -132,6 +143,68 @@ def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
         print(f"Error getting sub-issues for {repo}#{issue_number}: {e}")
         print(f"stderr: {e.stderr}")
         return []
+
+def format_timestamp(timestamp: str) -> str:
+    """Format the timestamp to show time ago."""
+    if not timestamp:
+        return "N/A"
+    try:
+        # Convert the timestamp to a datetime object
+        dt = datetime.datetime.fromisoformat(timestamp[:-1])
+        # Calculate the difference between now and the timestamp
+        now = datetime.datetime.now()
+        diff = now - dt
+        # Calculate days, hours, and minutes
+        days, seconds = diff.days, diff.seconds
+        hours, minutes = divmod(seconds, 3600)
+        minutes //= 60
+        # Format the time ago string
+        time_ago = []
+        if days > 0:
+            time_ago.append(f"{days}d")
+        if hours > 0:
+            time_ago.append(f"{hours}h")
+        if minutes > 0:
+            time_ago.append(f"{minutes}m")
+        return " ".join(time_ago)
+    except Exception as e:
+        print(f"Error formatting timestamp {timestamp}: {e}")
+        return timestamp
+
+def format_timestamp_with_days_ago(timestamp: Optional[str]) -> str:
+    """Format a timestamp string to 'YYYY-MM-DD (X days ago)' format.
+    
+    Args:
+        timestamp: An ISO format timestamp string or None
+        
+    Returns:
+        A formatted string or "N/A" if timestamp is None
+    """
+    if not timestamp or timestamp == "N/A":
+        return "N/A"
+    
+    try:
+        # Parse the ISO format timestamp
+        dt = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        
+        # Format the date part
+        date_str = dt.strftime("%Y-%m-%d")
+        
+        # Calculate days ago
+        now = datetime.datetime.now(datetime.timezone.utc)
+        delta = now - dt
+        days_ago = delta.days
+        
+        if days_ago == 0:
+            days_text = "today"
+        elif days_ago == 1:
+            days_text = "1 day ago"
+        else:
+            days_text = f"{days_ago} days ago"
+        
+        return f"{date_str} ({days_text})"
+    except (ValueError, TypeError):
+        return timestamp  # Return the original string if parsing fails
 
 def generate_report(issues: List[str]) -> None:
     """Generate a report of all sub-issues with their labels using gh CLI."""
@@ -184,16 +257,16 @@ def generate_report(issues: List[str]) -> None:
 
     # Print report in markdown format
     print("\n# Sub-Issues Report")
-    print("\n| status | issue | target date |")
-    print("|---|:--|:--|")
+    print("\n| status | issue | target date | last update |")
+    print("|---|:--|:--|:--|")
     
     for status in status_labels.keys():    
         for issue in all_sub_issues:
             if issue.get("status") != status:
                 continue # super dumb way to do this lol
 
-            url = issue.get("url", "N/A")
-            title = issue.get("title", "N/A")
+            url = issue.get("url", "")
+            title = issue.get("title", "")
             issue_link = f"[{title}]({url})"
 
             status_name = issue.get("status")
@@ -202,8 +275,12 @@ def generate_report(issues: List[str]) -> None:
             # Get target date
             target_date = issue.get("target_date", "?")
             
+            # Get and format last updated timestamp
+            last_updated_timestamp = issue.get("last_updated_at", "N/A")
+            formatted_timestamp = format_timestamp_with_days_ago(last_updated_timestamp)
+            
             # Print the row
-            print(f"| {status_with_emoji} | {issue_link} | {target_date} |")
+            print(f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp} |")
 
 if __name__ == "__main__":
     try:
@@ -211,7 +288,7 @@ if __name__ == "__main__":
         if len(sys.argv) > 1:
             issues = sys.argv[1:]
         else:
-            print("Usage: python subissues_report.py <issue_url_1> <issue_url_2> ...")
+            print(f"Usage: python {__file__} <issue_url_1> <issue_url_2> ...")
             sys.exit(1)
 
 
