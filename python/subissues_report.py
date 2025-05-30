@@ -26,13 +26,14 @@ def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
         return repo, issue_number
     raise ValueError(f"Invalid GitHub issue URL: {issue_url}")
 
-def get_target_date_from_comments(repo: str, issue_number: str) -> Tuple[Optional[str], Optional[str]]:
+def get_target_date_from_comments(repo: str, issue_number: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Extract Target Date from issue comments, searching from newest to oldest.
     
     Returns:
-        A tuple (target_date, comment_created_at) where:
+        A tuple (target_date, comment_created_at, comment_url) where:
         - target_date: The extracted target date or None if not found
         - comment_created_at: The timestamp of the comment containing the target date or None if not found
+        - comment_url: The URL of the comment containing the target date or None if not found
     """
     try:
         # Fetch comments for the issue using GitHub API
@@ -77,17 +78,18 @@ def get_target_date_from_comments(repo: str, issue_number: str) -> Tuple[Optiona
             if match:
                 target_date = match.group(1).strip()
                 comment_timestamp = comment.get("created_at")
-                return target_date, comment_timestamp
+                comment_url = comment.get("html_url") # Get the URL to the comment
+                return target_date, comment_timestamp, comment_url
         
-        return None, None
+        return None, None, None
     except subprocess.CalledProcessError as e:
         print(f"Error getting comments for {repo}#{issue_number}: {e}")
         if hasattr(e, 'stderr'):
             print(f"stderr: {e.stderr}")
-        return None, None
+        return None, None, None
     except json.JSONDecodeError:
         print(f"Error decoding comments JSON for {repo}#{issue_number}")
-        return None, None
+        return None, None, None
 
 def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
     """Get sub-issues using the GitHub Sub-issues API via gh CLI."""
@@ -129,9 +131,10 @@ def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
                 cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state"]
                 sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 detailed_sub_issue = json.loads(sub_result.stdout)
-                target_date, comment_timestamp = get_target_date_from_comments(sub_repo, sub_issue_number)
+                target_date, comment_timestamp, comment_url = get_target_date_from_comments(sub_repo, sub_issue_number)
                 detailed_sub_issue["target_date"] = target_date if target_date else "N/A"
                 detailed_sub_issue["last_updated_at"] = comment_timestamp if comment_timestamp else "N/A"
+                detailed_sub_issue["comment_url"] = comment_url if comment_url else "N/A"
                 
                 sub_issues.append(detailed_sub_issue)
             else:
@@ -171,16 +174,17 @@ def format_timestamp(timestamp: str) -> str:
         print(f"Error formatting timestamp {timestamp}: {e}")
         return timestamp
 
-def format_timestamp_with_days_ago(timestamp: Optional[str]) -> str:
-    """Format a timestamp string to 'YYYY-MM-DD (X days ago)' format.
+def format_timestamp_with_days_ago(timestamp: Optional[str], comment_url: Optional[str]) -> str:
+    """Format a timestamp string to a markdown link with text 'YYYY-MM-DD (X days ago)'.
     
     Args:
         timestamp: An ISO format timestamp string or None
+        comment_url: The URL to the comment
         
     Returns:
-        A formatted string or "N/A" if timestamp is None
+        A formatted markdown link or "N/A" if timestamp or comment_url is None
     """
-    if not timestamp or timestamp == "N/A":
+    if not timestamp or timestamp == "N/A" or not comment_url or comment_url == "N/A":
         return "N/A"
     
     try:
@@ -202,7 +206,9 @@ def format_timestamp_with_days_ago(timestamp: Optional[str]) -> str:
         else:
             days_text = f"{days_ago} days ago"
         
-        return f"{date_str} ({days_text})"
+        # Format as a markdown link
+        display_text = f"{date_str} ({days_text})"
+        return f"[{display_text}]({comment_url})"
     except (ValueError, TypeError):
         return timestamp  # Return the original string if parsing fails
 
@@ -275,12 +281,13 @@ def generate_report(issues: List[str]) -> None:
             # Get target date
             target_date = issue.get("target_date", "?")
             
-            # Get and format last updated timestamp
+            # Get and format last updated timestamp with a link to the comment
             last_updated_timestamp = issue.get("last_updated_at", "N/A")
-            formatted_timestamp = format_timestamp_with_days_ago(last_updated_timestamp)
+            comment_url = issue.get("comment_url", "N/A")
+            formatted_timestamp_link = format_timestamp_with_days_ago(last_updated_timestamp, comment_url)
             
             # Print the row
-            print(f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp} |")
+            print(f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp_link} |")
 
 if __name__ == "__main__":
     try:
