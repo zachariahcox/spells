@@ -12,9 +12,9 @@ import datetime
 status_labels = {
     "done": ":purple_circle:", 
     "on track": ":green_circle:", 
-    "inactive": ":white_circle:", 
     "at risk": ":yellow_circle:", 
     "high risk": ":red_circle:", 
+    "inactive": ":white_circle:", 
 }
 
 def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
@@ -174,13 +174,17 @@ def format_timestamp(timestamp: str) -> str:
         print(f"Error formatting timestamp {timestamp}: {e}")
         return timestamp
 
-def format_timestamp_with_days_ago(timestamp: Optional[str], comment_url: Optional[str]) -> str:
+def format_timestamp_with_days_ago(
+        timestamp: Optional[str], 
+        comment_url: Optional[str], 
+        include_days_ago: bool) -> str:
     """Format a timestamp string to a markdown link with text 'YYYY-MM-DD (X days ago)'.
     
     Args:
         timestamp: An ISO format timestamp string or None
         comment_url: The URL to the comment
-        
+        include_days_ago: Whether to include the 'X days ago' text
+
     Returns:
         A formatted markdown link or "N/A" if timestamp or comment_url is None
     """
@@ -195,19 +199,22 @@ def format_timestamp_with_days_ago(timestamp: Optional[str], comment_url: Option
         date_str = dt.strftime("%Y-%m-%d")
         
         # Calculate days ago
-        now = datetime.datetime.now(datetime.timezone.utc)
-        delta = now - dt
-        days_ago = delta.days
-        
-        if days_ago == 0:
-            days_text = "today"
-        elif days_ago == 1:
-            days_text = "1 day ago"
-        else:
-            days_text = f"{days_ago} days ago"
+        days_text = ""
+        if include_days_ago:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            delta = now - dt
+            days_ago = delta.days
+            
+            if days_ago == 0:
+                days_text = "today"
+            elif days_ago == 1:
+                days_text = "1 day ago"
+            else:
+                days_text = f"{days_ago} days ago"
+            days_text = f" ({days_text})"
         
         # Format as a markdown link
-        display_text = f"{date_str} ({days_text})"
+        display_text = f"{date_str}{days_text}"
         return f"[{display_text}]({comment_url})"
     except (ValueError, TypeError):
         return timestamp  # Return the original string if parsing fails
@@ -251,18 +258,19 @@ def generate_report(issues: List[str]) -> None:
         print("  No sub-issues found.")
         sys.exit(1)
     
+    # Assign status to each issue based on labels
     for issue in all_sub_issues:
-        # Format status column - find labels that match our status_labels
-        status = ":question: unknown"
-        for label in issue.get("labels", []):
-            label_name = label.get("name", "").lower()
-            if label_name in status_labels:
-                status = label_name
+        label_names = [label.get("name", "").lower() for label in issue.get("labels", [])]
+        for s in status_labels.keys():
+            if s in label_names:
+                issue["status"] = s
                 break
-        issue["status"] = status
+        # If no status label found, set to 'inactive'
+        if "status" not in issue:
+            issue["status"] = "inactive"
 
     # Print report in markdown format
-    print("\n# Sub-Issues Report")
+    print("\n### Status Report, ", datetime.datetime.now().strftime("%Y-%m-%d"))
     print("\n| status | issue | target date | last update |")
     print("|---|:--|:--|:--|")
     
@@ -284,8 +292,8 @@ def generate_report(issues: List[str]) -> None:
             # Get and format last updated timestamp with a link to the comment
             last_updated_timestamp = issue.get("last_updated_at", "N/A")
             comment_url = issue.get("comment_url", "N/A")
-            formatted_timestamp_link = format_timestamp_with_days_ago(last_updated_timestamp, comment_url)
-            
+            formatted_timestamp_link = format_timestamp_with_days_ago(last_updated_timestamp, comment_url, False)
+
             # Print the row
             print(f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp_link} |")
 
