@@ -7,14 +7,16 @@ import shutil
 import sys
 import datetime
 
+# Default configuration values
+DEFAULT_SHOW_PARENT = False  # Parent column is not shown by default
 
 # standard status labels and some emojis for display
 status_labels = {
-    "done": ":purple_circle:", 
-    "on track": ":green_circle:", 
-    "at risk": ":yellow_circle:", 
-    "high risk": ":red_circle:", 
-    "inactive": ":white_circle:", 
+    "done": "🟣", 
+    "on track": "🟢", 
+    "at risk": "🟡", 
+    "high risk": "🔴", 
+    "inactive": "⚪", 
 }
 
 def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
@@ -91,8 +93,15 @@ def get_target_date_from_comments(repo: str, issue_number: str) -> Tuple[Optiona
         print(f"Error decoding comments JSON for {repo}#{issue_number}")
         return None, None, None
 
-def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
-    """Get sub-issues using the GitHub Sub-issues API via gh CLI."""
+def get_sub_issues(repo: str, issue_number: str, parent_url: Optional[str] = None, parent_title: Optional[str] = None) -> List[Dict]:
+    """Get sub-issues using the GitHub Sub-issues API via gh CLI.
+    
+    Args:
+        repo: Repository in owner/repo format
+        issue_number: The issue number
+        parent_url: URL of the parent issue
+        parent_title: Title of the parent issue
+    """
     # Check if gh CLI is available
     if not shutil.which("gh"):
         raise RuntimeError("GitHub CLI (gh) not found. Please install it: https://cli.github.com/")
@@ -128,13 +137,17 @@ def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
             # Only proceed if we have valid information
             if sub_repo and sub_issue_number:
                 print(f"  - Found sub-issue: {sub_repo}#{sub_issue_number}")
-                cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state"]
+                cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state,closedAt"]
                 sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 detailed_sub_issue = json.loads(sub_result.stdout)
                 target_date, comment_timestamp, comment_url = get_target_date_from_comments(sub_repo, sub_issue_number)
                 detailed_sub_issue["target_date"] = target_date if target_date else "N/A"
                 detailed_sub_issue["last_updated_at"] = comment_timestamp if comment_timestamp else "N/A"
                 detailed_sub_issue["comment_url"] = comment_url if comment_url else "N/A"
+                
+                # Add parent issue information
+                detailed_sub_issue["parent_url"] = parent_url if parent_url else f"https://github.com/{repo}/issues/{issue_number}"
+                detailed_sub_issue["parent_title"] = parent_title if parent_title else f"{repo}#{issue_number}"
                 
                 sub_issues.append(detailed_sub_issue)
             else:
@@ -146,33 +159,6 @@ def get_sub_issues(repo: str, issue_number: str) -> List[Dict]:
         print(f"Error getting sub-issues for {repo}#{issue_number}: {e}")
         print(f"stderr: {e.stderr}")
         return []
-
-def format_timestamp(timestamp: str) -> str:
-    """Format the timestamp to show time ago."""
-    if not timestamp:
-        return "N/A"
-    try:
-        # Convert the timestamp to a datetime object
-        dt = datetime.datetime.fromisoformat(timestamp[:-1])
-        # Calculate the difference between now and the timestamp
-        now = datetime.datetime.now()
-        diff = now - dt
-        # Calculate days, hours, and minutes
-        days, seconds = diff.days, diff.seconds
-        hours, minutes = divmod(seconds, 3600)
-        minutes //= 60
-        # Format the time ago string
-        time_ago = []
-        if days > 0:
-            time_ago.append(f"{days}d")
-        if hours > 0:
-            time_ago.append(f"{hours}h")
-        if minutes > 0:
-            time_ago.append(f"{minutes}m")
-        return " ".join(time_ago)
-    except Exception as e:
-        print(f"Error formatting timestamp {timestamp}: {e}")
-        return timestamp
 
 def format_timestamp_with_days_ago(
         timestamp: Optional[str], 
@@ -216,11 +202,122 @@ def format_timestamp_with_days_ago(
         # Format as a markdown link
         display_text = f"{date_str}{days_text}"
         return f"[{display_text}]({comment_url})"
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as e:
+        print(f"Warning: Could not format timestamp '{timestamp}': {e}")
         return timestamp  # Return the original string if parsing fails
 
-def generate_report(issues: List[str]) -> None:
-    """Generate a report of all sub-issues with their labels using gh CLI."""
+def render_markdown_report(
+    issues: List[Dict], 
+    show_parent: bool = True, 
+    since: Optional[datetime.datetime] = None
+) -> str:
+    """Render the issues as a markdown report.
+    
+    Args:
+        issues: List of issue dictionaries
+        show_parent: Whether to include the parent column
+        since: Filter out issues with last update older than this date
+        
+    Returns:
+        Markdown formatted report as a string
+    """
+    result = []
+    
+    # Add report header with current date
+    result.append(f"\n### Status Report, {datetime.datetime.now().strftime('%Y-%m-%d')}")
+    
+    # Create table headers based on whether to show parent column
+    if show_parent:
+        result.append("\n| status | parent | issue | target date | last update |")
+        result.append("|---|:--|:--|:--|:--|")
+    else:
+        result.append("\n| status | issue | target date | last update |")
+        result.append("|---|:--|:--|:--|")
+    
+    # Process each status type in order
+    for status in status_labels.keys():
+        for issue in issues:
+            if issue.get("status") != status:
+                continue  # Filter by status
+                
+            # Filter by last update date if specified
+            if since:
+                # Determine which timestamp to use
+                is_closed = issue.get("state", "").lower() == "closed"
+                closed_at = issue.get("closedAt")
+                if is_closed and closed_at:
+                    timestamp = closed_at
+                else:
+                    timestamp = issue.get("last_updated_at", "N/A")
+                
+                # Skip if timestamp is before since date or not available
+                if timestamp == "N/A":
+                    continue
+                try:
+                    update_date = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    if update_date < since:
+                        continue
+                except (ValueError, TypeError) as e:
+                    print(f"Warning: Could not parse date '{timestamp}': {e}")
+                    continue  # Skip if we can't parse the date
+            
+            # Issue details
+            url = issue.get("url", "")
+            title = issue.get("title", "")
+            issue_link = f"[{title}]({url})"
+            
+            # Status details
+            status_name = issue.get("status", "inactive")
+            if status_name in status_labels:
+                status_with_emoji = f"{status_labels[status_name]} {status_name}"
+            else:
+                status_with_emoji = f":question: {status_name}"
+            
+            # Target date
+            target_date = issue.get("target_date", "?")
+            
+            # Choose which timestamp and URL to use for "last update"
+            timestamp = None
+            url = None
+            is_closed = issue.get("state", "").lower() == "closed"
+            closed_at = issue.get("closedAt")
+            if is_closed and closed_at:
+                # For closed issues, use the closed timestamp
+                timestamp = closed_at
+                url = issue.get("url", "N/A")  # Link to the issue itself
+            else:
+                # For open issues, use the comment timestamp
+                timestamp = issue.get("last_updated_at", "N/A")
+                url = issue.get("comment_url", "N/A")
+                
+            formatted_timestamp_link = format_timestamp_with_days_ago(timestamp, url, False)
+            
+            # Parent issue details (if showing)
+            row = ""
+            if show_parent:
+                parent_url = issue.get("parent_url", "")
+                parent_title = issue.get("parent_title", "")
+                parent_link = f"[{parent_title}]({parent_url})"
+                row = f"| {status_with_emoji} | {parent_link} | {issue_link} | {target_date} | {formatted_timestamp_link} |"
+            else:
+                row = f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp_link} |"
+            
+            result.append(row)
+    
+    return "\n".join(result)
+
+def generate_report(
+        issues: List[str], 
+        show_parent: bool = DEFAULT_SHOW_PARENT, 
+        since: Optional[datetime.datetime] = None
+        ) -> None:
+    """Generate a report of all sub-issues with their labels using gh CLI.
+    
+    Args:
+        issues: List of GitHub issue URLs
+        show_parent: Whether to include parent column in the report
+        since: Minimum date for filtering issues by last update
+    """
     # Check if gh CLI is available and authenticated
     if not shutil.which("gh"):
         print("Error: GitHub CLI (gh) not found.")
@@ -242,7 +339,19 @@ def generate_report(issues: List[str]) -> None:
             repo, issue_number = extract_repo_and_issue_number(issue_url)
             print(f"Processing {repo} issue #{issue_number}...")
             
-            sub_issues = get_sub_issues(repo, issue_number)
+            # Fetch parent issue details
+            parent_url = issue_url
+            try:
+                cmd = ["gh", "issue", "view", issue_number, "--repo", repo, "--json", "url,title"]
+                parent_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                parent_details = json.loads(parent_result.stdout)
+                parent_title = parent_details.get("title", f"{repo}#{issue_number}")
+                parent_url = parent_details.get("url", issue_url) # use this in case there was a redirect.
+            except Exception as e:
+                print(f"  Warning: Could not fetch parent issue details: {e}")
+                parent_title = f"{repo}#{issue_number}"
+            
+            sub_issues = get_sub_issues(repo, issue_number, parent_url, parent_title)
             all_sub_issues.extend(sub_issues)
             
             print(f"  Found {len(sub_issues)} sub-issues for {issue_url}")
@@ -270,44 +379,38 @@ def generate_report(issues: List[str]) -> None:
             issue["status"] = "inactive"
 
     # Print report in markdown format
-    print("\n### Status Report, ", datetime.datetime.now().strftime("%Y-%m-%d"))
-    print("\n| status | issue | target date | last update |")
-    print("|---|:--|:--|:--|")
-    
-    for status in status_labels.keys():    
-        for issue in all_sub_issues:
-            if issue.get("status") != status:
-                continue # super dumb way to do this lol
-
-            url = issue.get("url", "")
-            title = issue.get("title", "")
-            issue_link = f"[{title}]({url})"
-
-            status_name = issue.get("status")
-            status_with_emoji = f"{status_labels[status_name]} {status_name}"
-            
-            # Get target date
-            target_date = issue.get("target_date", "?")
-            
-            # Get and format last updated timestamp with a link to the comment
-            last_updated_timestamp = issue.get("last_updated_at", "N/A")
-            comment_url = issue.get("comment_url", "N/A")
-            formatted_timestamp_link = format_timestamp_with_days_ago(last_updated_timestamp, comment_url, False)
-
-            # Print the row
-            print(f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp_link} |")
+    print(render_markdown_report(
+        issues=all_sub_issues, 
+        show_parent=show_parent, 
+        since=since
+    ))
 
 if __name__ == "__main__":
     try:
-        # parse list of issues from command line arguments
-        if len(sys.argv) > 1:
-            issues = sys.argv[1:]
-        else:
-            print(f"Usage: python {__file__} <issue_url_1> <issue_url_2> ...")
-            sys.exit(1)
+        # Set up argument parser
+        import argparse
+        parser = argparse.ArgumentParser(description="Generate a report of GitHub sub-issues")
+        parser.add_argument("issues", nargs="+", help="GitHub issue URLs to process")
+        parser.add_argument("--include-parent", action="store_true", help="Include parent column in the report")
+        parser.add_argument("--since", type=str, help="Only include issues updated on or after this date (YYYY-MM-DD)")
+        
+        args = parser.parse_args()
 
-
-        generate_report(issues)
+        # Parse the since date if provided
+        since = None
+        if args.since:
+            try:
+                since = datetime.datetime.fromisoformat(args.since)
+                print(f"Filtering issues updated after {since}")
+            except ValueError:
+                print(f"Warning: Invalid date format '{args.since}'. Expected YYYY-MM-DD.")
+                sys.exit(1)
+        # Generate the report with command line options
+        generate_report(
+            issues=args.issues,
+            show_parent=args.include_parent,
+            since=since
+        )
     except KeyboardInterrupt:
         print("\nOperation canceled by user.")
         sys.exit(0)
