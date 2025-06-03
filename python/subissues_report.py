@@ -1,11 +1,14 @@
 # This script uses the GitHub CLI to fetch sub-issues of a given list of issues.
 import json
+import os
 import re
 import subprocess
 from typing import List, Dict, Tuple, Optional
 import shutil
 import sys
 import datetime
+import traceback
+import argparse
 
 # Default configuration values
 DEFAULT_SHOW_PARENT = False  # Parent column is not shown by default
@@ -309,7 +312,8 @@ def render_markdown_report(
 def generate_report(
         issues: List[str], 
         show_parent: bool = DEFAULT_SHOW_PARENT, 
-        since: Optional[datetime.datetime] = None
+        since: Optional[datetime.datetime] = None,
+        output_file: Optional[str] = None
         ) -> None:
     """Generate a report of all sub-issues with their labels using gh CLI.
     
@@ -317,6 +321,7 @@ def generate_report(
         issues: List of GitHub issue URLs
         show_parent: Whether to include parent column in the report
         since: Minimum date for filtering issues by last update
+        output_file: Optional file path to write the markdown output instead of printing to console
     """
     # Check if gh CLI is available and authenticated
     if not shutil.which("gh"):
@@ -362,6 +367,7 @@ def generate_report(
             print(f"Exception args: {e.args}")
             if isinstance(e, subprocess.CalledProcessError) and hasattr(e, 'stderr'):
                 print(f"stderr: {e.stderr}")
+            print(traceback.format_exc())
     
     if not all_sub_issues:
         print("  No sub-issues found.")
@@ -378,21 +384,42 @@ def generate_report(
         if "status" not in issue:
             issue["status"] = "inactive"
 
-    # Print report in markdown format
-    print(render_markdown_report(
+    # Generate the markdown report
+    markdown_report = render_markdown_report(
         issues=all_sub_issues, 
         show_parent=show_parent, 
         since=since
-    ))
+    )
+    
+    # Either write to file or print to console
+    if output_file:
+        try:
+            # Check if the file exists to decide on mode
+            file_exists = os.path.exists(output_file)
+            # Use append mode if file exists and we're running in separate reports mode
+            mode = 'a' if file_exists else 'w'
+            
+            with open(output_file, mode) as f:
+                # Add new lines if appending
+                if mode == 'a':
+                    f.write("\n\n\n\n")
+                f.write(markdown_report)
+            
+        except IOError as e:
+            print(f"Error writing to file {output_file}: {e}")
+            print(markdown_report)  # Fallback to console output
+    else:
+        print(markdown_report)
 
 if __name__ == "__main__":
     try:
         # Set up argument parser
-        import argparse
         parser = argparse.ArgumentParser(description="Generate a report of GitHub sub-issues")
-        parser.add_argument("issues", nargs="+", help="GitHub issue URLs to process")
+        parser.add_argument("issues", nargs="+", help="The 'parent' GitHub issue URLs to search for sub-issues")
         parser.add_argument("--include-parent", action="store_true", help="Include parent column in the report")
         parser.add_argument("--since", type=str, help="Only include issues updated on or after this date (YYYY-MM-DD)")
+        parser.add_argument("--output-file", "-o", type=str, help="Write the markdown report to this file instead of standard output")
+        parser.add_argument("--separate-reports", "-s", action="store_true", help="Generate a separate report for each parent issue")
         
         args = parser.parse_args()
 
@@ -405,12 +432,35 @@ if __name__ == "__main__":
             except ValueError:
                 print(f"Warning: Invalid date format '{args.since}'. Expected YYYY-MM-DD.")
                 sys.exit(1)
-        # Generate the report with command line options
-        generate_report(
-            issues=args.issues,
-            show_parent=args.include_parent,
-            since=since
-        )
+
+        # If output file exists and we're about to generate separate reports, remove it first
+        if args.output_file and os.path.exists(args.output_file):
+            try:
+                os.remove(args.output_file)
+                print(f"Removed existing file: {args.output_file}")
+            except OSError as e:
+                print(f"Warning: Could not remove existing file {args.output_file}: {e}")
+            
+
+        # Check if the separate reports mode is enabled
+        if args.separate_reports:
+            # Generate a separate report for each parent issue
+            for issue_url in args.issues:
+                generate_report(
+                    issues=[issue_url],  # Pass a single issue as a list
+                    show_parent=args.include_parent,
+                    since=since,
+                    output_file=args.output_file
+                )
+        else:
+            # Generate a combined report with all issues (default behavior)
+            generate_report(
+                issues=args.issues,
+                show_parent=args.include_parent,
+                since=since,
+                output_file=args.output_file
+            )
+
     except KeyboardInterrupt:
         print("\nOperation canceled by user.")
         sys.exit(0)
