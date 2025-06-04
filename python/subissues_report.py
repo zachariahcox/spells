@@ -14,7 +14,7 @@ import argparse
 DEFAULT_SHOW_PARENT = False  # Parent column is not shown by default
 
 # standard status labels and some emojis for display
-status_labels = {
+STATUS_LABELS = {
     "done": "🟣", 
     "on track": "🟢", 
     "at risk": "🟡", 
@@ -31,7 +31,10 @@ def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
         return repo, issue_number
     raise ValueError(f"Invalid GitHub issue URL: {issue_url}")
 
-def get_target_date_from_comments(repo: str, issue_number: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def get_target_date_from_comments(
+        repo: str, 
+        issue_number: str
+        ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Extract Target Date from issue comments, searching from newest to oldest.
     
     Returns:
@@ -96,7 +99,12 @@ def get_target_date_from_comments(repo: str, issue_number: str) -> Tuple[Optiona
         print(f"Error decoding comments JSON for {repo}#{issue_number}")
         return None, None, None
 
-def get_sub_issues(repo: str, issue_number: str, parent_url: Optional[str] = None, parent_title: Optional[str] = None) -> List[Dict]:
+def get_sub_issues(
+        repo: str, 
+        issue_number: str, 
+        parent_url: Optional[str] = None, 
+        parent_title: Optional[str] = None
+        ) -> List[Dict]:
     """Get sub-issues using the GitHub Sub-issues API via gh CLI.
     
     Args:
@@ -121,8 +129,7 @@ def get_sub_issues(repo: str, issue_number: str, parent_url: Optional[str] = Non
             "-H", "X-GitHub-Api-Version: 2022-11-28",
             api_endpoint
         ]
-        
-        print(f"  Running: {' '.join(cmd)}")
+
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         sub_issues_data = json.loads(result.stdout)
         
@@ -166,8 +173,10 @@ def get_sub_issues(repo: str, issue_number: str, parent_url: Optional[str] = Non
 def format_timestamp_with_days_ago(
         timestamp: Optional[str], 
         comment_url: Optional[str], 
-        include_days_ago: bool) -> str:
-    """Format a timestamp string to a markdown link with text 'YYYY-MM-DD (X days ago)'.
+        include_days_ago: bool
+        ) -> str:
+    """
+    Format a timestamp string to a markdown link with text 'YYYY-MM-DD (X days ago)'.
     
     Args:
         timestamp: An ISO format timestamp string or None
@@ -210,10 +219,11 @@ def format_timestamp_with_days_ago(
         return timestamp  # Return the original string if parsing fails
 
 def render_markdown_report(
-    issues: List[Dict], 
-    show_parent: bool = True, 
-    since: Optional[datetime.datetime] = None
-) -> str:
+        issues: List[Dict], 
+        show_parent: bool = True, 
+        since: Optional[datetime.datetime] = None,
+        title: Optional[str] = None
+        ) -> str:
     """Render the issues as a markdown report.
     
     Args:
@@ -227,7 +237,8 @@ def render_markdown_report(
     result = []
     
     # Add report header with current date
-    result.append(f"\n### Status Report, {datetime.datetime.now().strftime('%Y-%m-%d')}")
+    title = title or "Status Report"
+    result.append(f"\n### {title}, {datetime.datetime.now().strftime('%Y-%m-%d')}")
     
     # Create table headers based on whether to show parent column
     if show_parent:
@@ -238,7 +249,7 @@ def render_markdown_report(
         result.append("|---|:--|:--|:--|")
     
     # Process each status type in order
-    for status in status_labels.keys():
+    for status in STATUS_LABELS.keys():
         for issue in issues:
             if issue.get("status") != status:
                 continue  # Filter by status
@@ -271,8 +282,8 @@ def render_markdown_report(
             
             # Status details
             status_name = issue.get("status", "inactive")
-            if status_name in status_labels:
-                status_with_emoji = f"{status_labels[status_name]} {status_name}"
+            if status_name in STATUS_LABELS:
+                status_with_emoji = f"{STATUS_LABELS[status_name]} {status_name}"
             else:
                 status_with_emoji = f":question: {status_name}"
             
@@ -307,6 +318,7 @@ def render_markdown_report(
             
             result.append(row)
     
+    result.append("\n")
     return "\n".join(result)
 
 def generate_report(
@@ -371,24 +383,29 @@ def generate_report(
     
     if not all_sub_issues:
         print("  No sub-issues found.")
-        sys.exit(1)
+        return
     
-    # Assign status to each issue based on labels
+    # Check the labels to determine the status of each issue
+    # Check these in order in case there are multiple "status" labels -- we pick the first one.
     for issue in all_sub_issues:
+        status = "inactive"
         label_names = [label.get("name", "").lower() for label in issue.get("labels", [])]
-        for s in status_labels.keys():
-            if s in label_names:
-                issue["status"] = s
+        for sl in STATUS_LABELS.keys():
+            if sl in label_names:
+                status = sl
                 break
-        # If no status label found, set to 'inactive'
-        if "status" not in issue:
-            issue["status"] = "inactive"
+        issue["status"] = status
 
     # Generate the markdown report
+    custom_title = None 
+    if len(issues) == 1:
+        custom_title = f"[{parent_title}]({parent_url})" # these variables will escape the loop because python.
+
     markdown_report = render_markdown_report(
         issues=all_sub_issues, 
         show_parent=show_parent, 
-        since=since
+        since=since,
+        title = custom_title
     )
     
     # Either write to file or print to console
@@ -419,7 +436,7 @@ if __name__ == "__main__":
         parser.add_argument("--include-parent", action="store_true", help="Include parent column in the report")
         parser.add_argument("--since", type=str, help="Only include issues updated on or after this date (YYYY-MM-DD)")
         parser.add_argument("--output-file", "-o", type=str, help="Write the markdown report to this file instead of standard output")
-        parser.add_argument("--separate-reports", "-s", action="store_true", help="Generate a separate report for each parent issue")
+        parser.add_argument("--individual", "-i", action="store_true", help="Generate a separate report for each provided issue")
         
         args = parser.parse_args()
 
@@ -443,8 +460,7 @@ if __name__ == "__main__":
             
 
         # Check if the separate reports mode is enabled
-        if args.separate_reports:
-            # Generate a separate report for each parent issue
+        if args.individual:
             for issue_url in args.issues:
                 generate_report(
                     issues=[issue_url],  # Pass a single issue as a list
