@@ -42,8 +42,11 @@ def meets_constraint(board, proposedX, proposedY):
 def solve_low_to_high_column_wise(solutions, board, x):
     """
     return true when the board has a valid solution
+    solutions is a list that will be populated with all valid solutions
+    board is a 2d matrix of boolean values, where True means a move is made at that position
+    x is a proposed column index to consider for the next move.
     """
-    # find a valid y position for column x
+    # given column x, find a valid y position
     for y in range(rows):
         if meets_constraint(board, x, y):
             # found one, store the proposed move in the matrix
@@ -60,9 +63,10 @@ def solve_low_to_high_column_wise(solutions, board, x):
 
             # recurse using this matrix as the new state
             elif solve_low_to_high_column_wise(solutions, board, x + 1):
-                return True # return True if we only want to find one solution
+                return True # (y, x) is part of a solution, so we can return True
 
-            # backtrack: this set of values (y,x) is not part of a solution
+            # backtrack
+            # this set of values (y, x) meets the local constraint, but is not part of a full solution
             # reset the bit and try the next y value
             board[y][x] = False
 

@@ -1,5 +1,6 @@
 """
-Simple insert sort impl. Interesting emulation of std::rotate (though this is probably not faster in python?)
+Simple insert sort impl. 
+Interesting emulation of std::rotate (though this is probably not faster in python?)
 """
 def insertion_sort(elements):
 

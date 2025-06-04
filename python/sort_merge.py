@@ -1,3 +1,6 @@
+"""
+Merge Sort Implementation in Python
+"""
 def merge(left, right):
     result = []
 
@@ -14,7 +17,7 @@ def merge(left, right):
             result.append(right[j])
             j += 1
 
-    # one of these will be a no-op, but copy the remaining element without the compares
+    # one of these will be a no-op, but copy the remaining elements without the compares
     result += left[i:]
     result += right[j:]
     return result

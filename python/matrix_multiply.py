@@ -1,4 +1,8 @@
-
+"""
+An NxM matrix multiplied by an MxJ matrix results in an NxJ matrix.
+M is the number of elements to sum for the dot product of the two vectors.
+Rows x Columns
+"""
 
 def matrix_multiply(A, B):
     """

@@ -1,3 +1,6 @@
+'''
+https://neetcode.io/problems/last-stone-weight
+'''
 
 def lastStoneWeight(stones):
     """

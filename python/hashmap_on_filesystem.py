@@ -148,7 +148,7 @@ class FileSystemSet():
         if size < 1:
             return []
 
-        return [array[i:i+size] for i in range(0, len(array), size)]
+        return [array[i:i+size] for i in range(start=0, stop=len(array), step=size)]
 
     def cleanup(self, root):
         if os.path.exists(root):
