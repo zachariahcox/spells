@@ -350,7 +350,8 @@ def generate_report(
         return
     
     all_sub_issues = []
-    
+    parent_title = None
+    parent_url = None
     for issue_url in issues:
         try:
             repo, issue_number = extract_repo_and_issue_number(issue_url)
@@ -399,7 +400,7 @@ def generate_report(
     # Generate the markdown report
     custom_title = None 
     if len(issues) == 1:
-        custom_title = f"[{parent_title}]({parent_url})" # these variables will escape the loop because python.
+        custom_title = f"[{parent_title}]({parent_url})"
 
     markdown_report = render_markdown_report(
         issues=all_sub_issues, 
