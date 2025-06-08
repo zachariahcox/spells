@@ -146,7 +146,7 @@ def get_sub_issues(
             
             # Only proceed if we have valid information
             if sub_repo and sub_issue_number:
-                print(f"  - Found sub-issue: {sub_repo}#{sub_issue_number}")
+                print(f"  - Found: https://github.com/{sub_repo}/issues/{sub_issue_number}")
                 cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state,closedAt"]
                 sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 detailed_sub_issue = json.loads(sub_result.stdout)
@@ -354,7 +354,7 @@ def generate_report(
     for issue_url in issues:
         try:
             repo, issue_number = extract_repo_and_issue_number(issue_url)
-            print(f"Processing {repo} issue #{issue_number}...")
+            print(f"Processing {issue_url}...")
             
             # Fetch parent issue details
             parent_url = issue_url
@@ -371,7 +371,7 @@ def generate_report(
             sub_issues = get_sub_issues(repo, issue_number, parent_url, parent_title)
             all_sub_issues.extend(sub_issues)
             
-            print(f"  Found {len(sub_issues)} sub-issues for {issue_url}")
+            print(f"  Found {len(sub_issues)} sub-issues")
         except Exception as e:
             print(f"Error processing {issue_url}: {e}")
             # More detailed error output for debugging
