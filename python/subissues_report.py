@@ -230,6 +230,7 @@ def render_markdown_report(
         issues: List of issue dictionaries
         show_parent: Whether to include the parent column
         since: Filter out issues with last update older than this date
+        title: Optional title for the report
         
     Returns:
         Markdown formatted report as a string
@@ -248,75 +249,94 @@ def render_markdown_report(
         result.append("\n| status | issue | target date | last update |")
         result.append("|---|:--|:--|:--|")
     
-    # Process each status type in order
-    for status in STATUS_LABELS.keys():
-        for issue in issues:
-            if issue.get("status") != status:
-                continue  # Filter by status
-                
-            # Filter by last update date if specified
-            if since:
-                # Determine which timestamp to use
-                is_closed = issue.get("state", "").lower() == "closed"
-                closed_at = issue.get("closedAt")
-                if is_closed and closed_at:
-                    timestamp = closed_at
-                else:
-                    timestamp = issue.get("last_updated_at", "N/A")
-                
-                # Skip if timestamp is before since date or not available
-                if timestamp == "N/A":
-                    continue
-                try:
-                    update_date = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                    if update_date < since:
-                        continue
-                except (ValueError, TypeError) as e:
-                    print(f"Warning: Could not parse date '{timestamp}': {e}")
-                    continue  # Skip if we can't parse the date
-            
-            # Issue details
-            url = issue.get("url", "")
-            title = issue.get("title", "")
-            issue_link = f"[{title}]({url})"
-            
-            # Status details
-            status_name = issue.get("status", "inactive")
-            if status_name in STATUS_LABELS:
-                status_with_emoji = f"{STATUS_LABELS[status_name]} {status_name}"
-            else:
-                status_with_emoji = f":question: {status_name}"
-            
-            # Target date
-            target_date = issue.get("target_date", "?")
-            
-            # Choose which timestamp and URL to use for "last update"
-            timestamp = None
-            url = None
+    # First, filter issues by last update date if specified
+    filtered_issues = []
+    for issue in issues:
+        if since:
+            # Determine which timestamp to use
             is_closed = issue.get("state", "").lower() == "closed"
             closed_at = issue.get("closedAt")
             if is_closed and closed_at:
-                # For closed issues, use the closed timestamp
                 timestamp = closed_at
-                url = issue.get("url", "N/A")  # Link to the issue itself
             else:
-                # For open issues, use the comment timestamp
                 timestamp = issue.get("last_updated_at", "N/A")
-                url = issue.get("comment_url", "N/A")
-                
-            formatted_timestamp_link = format_timestamp_with_days_ago(timestamp, url, False)
             
-            # Parent issue details (if showing)
-            row = ""
-            if show_parent:
-                parent_url = issue.get("parent_url", "")
-                parent_title = issue.get("parent_title", "")
-                parent_link = f"[{parent_title}]({parent_url})"
-                row = f"| {status_with_emoji} | {parent_link} | {issue_link} | {target_date} | {formatted_timestamp_link} |"
-            else:
-                row = f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp_link} |"
+            # Skip if timestamp is before since date or not available
+            if timestamp == "N/A":
+                continue
+            try:
+                update_date = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                if update_date < since:
+                    continue
+            except (ValueError, TypeError) as e:
+                print(f"Warning: Could not parse date '{timestamp}': {e}")
+                continue  # Skip if we can't parse the date
+        filtered_issues.append(issue)
+    
+    # Sort issues by status, target date, and title
+    def get_sort_key(issue):
+        # Get status priority (order in STATUS_LABELS dict)
+        status = issue.get("status", "inactive")
+        status_priority = list(STATUS_LABELS.keys()).index(status) if status in STATUS_LABELS else 999
+        
+        # Convert target_date to comparable format
+        target_date = issue.get("target_date", "9999-99-99")  # Default to a far future date
+        # Make sure we can sort "N/A" dates as well
+        if target_date == "N/A" or not target_date:
+            target_date = "9999-99-99"
+        
+        # Get issue title for final sort key
+        title = issue.get("title", "")
+        
+        return (status_priority, target_date, title)
+    
+    # Sort the issues
+    sorted_issues = sorted(filtered_issues, key=get_sort_key)
+    
+    # Group by status and process each issue
+    for issue in sorted_issues:
+        # Issue details
+        url = issue.get("url", "")
+        title = issue.get("title", "")
+        issue_link = f"[{title}]({url})"
+        
+        # Status details
+        status_name = issue.get("status", "inactive")
+        if status_name in STATUS_LABELS:
+            status_with_emoji = f"{STATUS_LABELS[status_name]} {status_name}"
+        else:
+            status_with_emoji = f":question: {status_name}"
+        
+        # Target date
+        target_date = issue.get("target_date", "?")
+        
+        # Choose which timestamp and URL to use for "last update"
+        timestamp = None
+        url = None
+        is_closed = issue.get("state", "").lower() == "closed"
+        closed_at = issue.get("closedAt")
+        if is_closed and closed_at:
+            # For closed issues, use the closed timestamp
+            timestamp = closed_at
+            url = issue.get("url", "N/A")  # Link to the issue itself
+        else:
+            # For open issues, use the comment timestamp
+            timestamp = issue.get("last_updated_at", "N/A")
+            url = issue.get("comment_url", "N/A")
             
-            result.append(row)
+        formatted_timestamp_link = format_timestamp_with_days_ago(timestamp, url, False)
+        
+        # Parent issue details (if showing)
+        row = ""
+        if show_parent:
+            parent_url = issue.get("parent_url", "")
+            parent_title = issue.get("parent_title", "")
+            parent_link = f"[{parent_title}]({parent_url})"
+            row = f"| {status_with_emoji} | {parent_link} | {issue_link} | {target_date} | {formatted_timestamp_link} |"
+        else:
+            row = f"| {status_with_emoji} | {issue_link} | {target_date} | {formatted_timestamp_link} |"
+        
+        result.append(row)
     
     result.append("\n")
     return "\n".join(result)
@@ -359,6 +379,7 @@ def generate_report(
             
             # Fetch parent issue details
             parent_url = issue_url
+            parent_title = f"{repo}#{issue_number}"
             try:
                 cmd = ["gh", "issue", "view", issue_number, "--repo", repo, "--json", "url,title"]
                 parent_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -366,8 +387,8 @@ def generate_report(
                 parent_title = parent_details.get("title", f"{repo}#{issue_number}")
                 parent_url = parent_details.get("url", issue_url) # use this in case there was a redirect.
             except Exception as e:
-                print(f"  Warning: Could not fetch parent issue details: {e}")
-                parent_title = f"{repo}#{issue_number}"
+                print(f"  Warning: Could not fetch details for {issue_url}")
+                continue
             
             sub_issues = get_sub_issues(repo, issue_number, parent_url, parent_title)
             all_sub_issues.extend(sub_issues)
