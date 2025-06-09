@@ -8,6 +8,22 @@ class Node(object):
         self.left = None
         self.right= None
 
+    # unnecessary but fancy ways to add node setters and getters
+    @property
+    def left(self):
+        return self.left
+
+    @left.setter
+    def left(self, value):
+        self.left = value
+    @property
+    def right(self):
+        return self.right
+    
+    @right.setter
+    def right(self, value):
+        self.right = value
+
 def height(node):
     if not node:
         return 0
