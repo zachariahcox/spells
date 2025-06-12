@@ -1,11 +1,10 @@
 import json
-import os
-import re
 import sys
-from collections import deque
 from pathlib import Path
-from typing import Dict, Any, List, Set
+from typing import Dict, Set
 
+# This will hold the dependencies between queries and their used variables
+QUERY_PARAMETERS: Dict[str, Set[str]] = {}
 
 def get_kusto_default_for_type(param_type: str) -> str:
     """
@@ -34,10 +33,6 @@ def get_kusto_default_for_type(param_type: str) -> str:
         return 'dynamic({})'  # Empty dynamic object
     else:
         return 'dynamic(null)'  # Default fallback
-
-
-# This will hold the dependencies between queries and their used variables
-QUERY_PARAMETERS: Dict[str, Set[str]] = {}
 
 def get_used_parameters(base_queries_by_name, queries_by_id, query_id, in_progress=None) -> Set[str]:
     """
