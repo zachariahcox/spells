@@ -106,11 +106,82 @@ def function_signature(
     param_str = ', '.join(name for name, _ in parameters)
     return f"{function_name}({param_str})"
 
+def generate_kusto_function(bq_name, query_text, query_parameters, datasource_name, function_folder):
+    # Collect parameter information for function declaration
+    function_parameters = [f"{p}:{p_type}" for p, p_type in query_parameters]
+
+    # Create function docstring with description of parameters
+    func_description = f"Query extracted from '{datasource_name}' dashboard"
+    params = "\n    " + ',\n    '.join(function_parameters) + "\n" if function_parameters else ''
+
+    # Build the function creation command using list join approach for better readability
+    function_lines = [
+        f'.create-or-alter function {bq_name} with (',
+        f'  docstring="{func_description}",',
+        f'  folder="{function_folder}"',
+        f')',
+        f"{bq_name}({params}){{",
+        query_text,
+        "}"
+    ]
+    
+    return '\n'.join(function_lines)
+
+def generate_kusto_query(bq_name, query_text, query_parameters, datasource_name):
+    # Create let statements for parameters
+    parameter_initializations = [
+        f"let {p} = {KUSTO_DEFAULT_VALUES.get(p_type, 'dynamic(null)')};" 
+        for p, p_type in query_parameters
+    ]
+    
+    # Build query with components
+    query_lines = [
+        f"// database(\"{datasource_name}\").{bq_name}",
+        "//",
+    ]
+    
+    # Add parameter initializations if they exist
+    if parameter_initializations:
+        query_lines.extend(parameter_initializations)
+        query_lines.append("")  # Empty line for separation
+    
+    query_lines.extend([
+        "//",
+        query_text
+    ])
+    
+    return '\n'.join(query_lines)
+
+def generate_yaml_function(bq_name, query_text, query_parameters, datasource_name, function_folder):
+    # Create function docstring with description of parameters
+    doc_string = f"Query extracted from '{datasource_name}' dashboard"
+    
+    # Format the query body to maintain proper indentation
+    # Strip any leading/trailing whitespace and ensure consistent line endings
+    query_body = query_text.strip()
+    
+    # Process parameters if they exist
+    params = ','.join([f"{p}:{p_type}" for p, p_type in query_parameters]) if query_parameters else ''
+    
+    # Build the YAML document
+    yaml_lines = [
+        f"name: {bq_name}",
+        f"folder: {function_folder}",
+        f"docString: {doc_string}",
+        f"parameters: {params}",
+        "body: |-"
+    ]
+    
+    # Add indented query body with proper YAML block scalar formatting
+    for line in query_body.split('\n'):
+        yaml_lines.append(f"  {line}")
+    
+    return '\n'.join(yaml_lines)
+
 def extract_kusto_queries(
         dashboard_file_path, 
         output_folder='extracted',
-        create_functions=False,
-        function_folder='extracted'
+        function_folder='extracted',
         ):
     """
     Extract Kusto queries from Azure Data Explorer dashboard export file.
@@ -120,6 +191,7 @@ def extract_kusto_queries(
         output_folder: Folder to save extracted queries in
         create_functions: If True, convert each base query into a Kusto function
         function_folder: Folder name to use in the function docstring and creation command
+        create_yaml_functions: If True, generate functions in YAML format instead of KQL
     """
     # Create output folder if it doesn't exist
     output_path = Path(output_folder)
@@ -197,59 +269,54 @@ def extract_kusto_queries(
         # Get query name from variable name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
         
-        # Process parameters differently based on whether we're creating functions
-        if create_functions:
-            # Collect parameter information for function declaration
-            function_parameters = [f"{p}:{p_type}" for p, p_type in query_parameters]
-
-            # Create function docstring with description of parameters
-            func_description = f"Query extracted from '{datasource_name}' dashboard"
-            params = "\n    " + ',\n    '.join(function_parameters) + "\n" if function_parameters else ''
-
-            # Build the function creation command
-            final_text = f'.create-or-alter function {bq_name} with (\n'
-            final_text += f'  docstring="{func_description}",\n'
-            final_text += f'  folder="{function_folder}"\n'
-            final_text += f'  )\n'
-            final_text += f"{bq_name}({params}){{\n"
-            final_text += query_text
-            final_text += "\n}"
-            
-        else:
-            # Original behavior: Initialize parameter variables
-            parameter_initializations = []
-            parameter_initializations = [f"let {p} = {KUSTO_DEFAULT_VALUES.get(p_type, 'dynamic(null)')};" for p, p_type in query_parameters]
-            
-            # Build final content with let declarations
-            final_text = f"// database(\"{datasource_name}\".{bq_name}\n//\n"
-            if parameter_initializations:
-                final_text += "\n".join(parameter_initializations) + "\n"
-            final_text += "//\n" + query_text
-        
-        # Write the final query to the file overwriting any existing content
+        # generate the output contents
         datasource_folder = output_path
-        datasource_folder.mkdir(exist_ok=True)
-        file_path = datasource_folder / f"{bq_name}.kql"
-        with open(file_path, 'w') as f:
-            f.write(final_text)
-        
+        def save(path, content):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'w') as f:
+                f.write(content)
+
+        final_text = generate_kusto_function(
+            bq_name=bq_name,
+            query_text=query_text,
+            query_parameters=query_parameters,
+            datasource_name=datasource_name,
+            function_folder=function_folder
+        )
+        save(datasource_folder / "functions" / f"create_{bq_name}.kql", final_text)
+
+        final_text = generate_yaml_function(
+            bq_name=bq_name,
+            query_text=query_text,
+            query_parameters=query_parameters,
+            datasource_name=datasource_name,
+            function_folder=function_folder
+        )
+        save(datasource_folder / "yaml" / f"{bq_name}.yaml", final_text)
+            
+        final_text = generate_kusto_query(
+            bq_name=bq_name,
+            query_text=query_text,
+            query_parameters=query_parameters,
+            datasource_name=datasource_name
+        )
+        save(datasource_folder / "queries" / f"{bq_name}.kusto", final_text)
+    
         processed_count += 1
-
-    print(f"Generated {processed_count} {'functions' if create_functions else 'queries'} in '{output_folder}'")
-
+    print(f"Extracted {processed_count} base queries from dashboard '{dashboard_file_path}' into '{output_folder}'")
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description="Extract Kusto queries from Azure Data Explorer dashboard export")
     parser.add_argument("dashboard_file", help="Path to the dashboard JSON file")
     parser.add_argument("--output", "-o", default="extracted", help="Where to save the extracted queries")
-    parser.add_argument("--functions", "-f", action="store_true", help="Generate functions instead of queries")
+    parser.add_argument("--functions", "-f", action="store_true", help="Generate Kusto functions instead of queries")
+    parser.add_argument("--yaml", "-y", action="store_true", help="Generate functions in YAML format")
     parser.add_argument("--function_folder", "-ff", default="extracted", help="Where to create functions in the kusto database's /functions dir")
     args = parser.parse_args()
     
     extract_kusto_queries(
         args.dashboard_file, 
         args.output,
-        create_functions=args.functions,
         function_folder=args.function_folder
     )
