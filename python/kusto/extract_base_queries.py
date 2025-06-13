@@ -1,11 +1,19 @@
+"""
+This script extracts Kusto queries from an Azure Data Explorer dashboard export file.
+It is used to extract base queries into a format that can be stored in version control. 
+
+Dashboard exports follow this schema: https://dataexplorer.azure.com/static/d/schema/60/dashboard.json
+
+Usage: extract_base_queries.py [-h] [--output OUTPUT] [--function_folder FUNCTION_FOLDER] dashboard_file
+"""
 import json
 from pathlib import Path
 from typing import Dict, Set
 
-# This will hold the dependencies between queries and their used variables
+# Cache for used parameters to avoid redundant calculations
 QUERY_PARAMETERS: Dict[str, Set[str]] = {}
 
-# Dictionary mapping parameter types to their default values in Kusto syntax
+# What default values to use for each parameter type in Kusto
 KUSTO_DEFAULT_VALUES = {
     'string': '""',               # Empty string
     'long': '0',                  # Integer zero
@@ -17,84 +25,101 @@ KUSTO_DEFAULT_VALUES = {
     'dynamic': 'dynamic({})'      # Empty dynamic object
 }
 
-def get_used_parameters(base_queries_by_name, queries_by_id, query_id, in_progress=None) -> Set[str]:
-    """
-    Recursively find all parameters used by a query, accounting for dependencies on other queries.
-    
-    Args:
-        base_queries_by_name: Dictionary mapping variable names to base queries
-        queries_by_id: Dictionary mapping query IDs to query objects
-        query_id: ID of the query to analyze
-        in_progress: Set of query IDs currently being processed (for cycle detection)
-        
-    Returns:
-        Set of parameter names used by this query and its dependencies
-    """
-    global QUERY_PARAMETERS
-    
-    # Return cached result if available
-    if query_id in QUERY_PARAMETERS:
-        return QUERY_PARAMETERS[query_id]
-    
-    # Initialize in-progress queries set if not provided
-    if in_progress is None:
-        in_progress = set()
-    
-    # Prevent circular dependencies
-    if query_id in in_progress:
-        print(f"Warning: Circular dependency detected for query ID {query_id}")
-        return set()  # Return empty set for circular references
-    
-    # Mark this query as in-progress
-    in_progress.add(query_id)
-    
-    # Get the query and initialize parameters
-    query = queries_by_id.get(query_id)
-    if query is None:
-        print(f"Warning: Query ID {query_id} not found")
-        in_progress.remove(query_id)  # Remove from in-progress set before returning
-        return set()
-    
-    parameters = set()
-    text = query.get('text', '')
-    
-    # Check for _startTime and _endTime in used variables in query text
-    if '_startTime' in text:
-        parameters.add('_startTime')
-    if '_endTime' in text:
-        parameters.add('_endTime')
-    
-    # Process each used variable
-    for var in query.get('usedVariables', []):
-        if var in base_queries_by_name:
-            bq = base_queries_by_name[var]
-            bq_query_id = bq.get('queryId')
-            if not bq_query_id:
-                continue
-            parameters.update(get_used_parameters(
-                base_queries_by_name, 
-                queries_by_id, 
-                bq_query_id, 
-                in_progress
-            ))
-        else:
-            # Otherwise, it's a parameter
-            parameters.add(var)
-
-    # Cache results for future calls
-    QUERY_PARAMETERS[query_id] = parameters
-    
-    # Remove from in-progress set now that we're done with this branch
-    in_progress.remove(query_id)
-    
-    return parameters
-
-def get_parameters_for_query(
+def parameters_for_query(
     base_queries_by_name, 
     parameters_by_name,
     queries_by_id,
     query_id
 ) -> list[tuple[str, str]]:
+    """
+    if this query were a function, what parameters would it take?
+    
+    Args:
+        base_queries_by_name: Dictionary mapping variable names to base queries
+        parameters_by_name: Dictionary mapping parameter names to parameter objects
+        queries_by_id: Dictionary mapping query IDs to query objects
+        query_id: ID of the query to analyze
+        
+    Returns:
+        List of tuples (parameter_name, parameter_type) for the query, with timestamps sorted to the end
+    """
+    def get_used_parameters(
+        base_queries_by_name, 
+        queries_by_id, 
+        query_id, 
+        in_progress=None
+        ) -> Set[str]:
+        """
+        Recursively find all parameters used by a query, accounting for dependencies on other queries.
+        
+        Args:
+            base_queries_by_name: Dictionary mapping variable names to base queries
+            queries_by_id: Dictionary mapping query IDs to query objects
+            query_id: ID of the query to analyze
+            in_progress: Set of query IDs currently being processed (for cycle detection)
+            
+        Returns:
+            Set of parameter names used by this query and its dependencies
+        """
+        global QUERY_PARAMETERS
+        
+        # Return cached result if available
+        if query_id in QUERY_PARAMETERS:
+            return QUERY_PARAMETERS[query_id]
+        
+        # Initialize in-progress queries set if not provided
+        if in_progress is None:
+            in_progress = set()
+        
+        # Prevent circular dependencies
+        if query_id in in_progress:
+            print(f"Warning: Circular dependency detected for query ID {query_id}")
+            return set()  # Return empty set for circular references
+        
+        # Mark this query as in-progress
+        in_progress.add(query_id)
+        
+        # Get the query and initialize parameters
+        query = queries_by_id.get(query_id)
+        if query is None:
+            print(f"Warning: Query ID {query_id} not found")
+            in_progress.remove(query_id)  # Remove from in-progress set before returning
+            return set()
+        
+        parameters = set()
+        text = query.get('text', '')
+        
+        # Check for _startTime and _endTime in used variables in query text
+        if '_startTime' in text:
+            parameters.add('_startTime')
+        if '_endTime' in text:
+            parameters.add('_endTime')
+        
+        # Process each used variable
+        for var in query.get('usedVariables', []):
+            if var in base_queries_by_name:
+                bq = base_queries_by_name[var]
+                bq_query_id = bq.get('queryId')
+                if not bq_query_id:
+                    continue
+                parameters.update(get_used_parameters(
+                    base_queries_by_name, 
+                    queries_by_id, 
+                    bq_query_id, 
+                    in_progress
+                ))
+            else:
+                # Otherwise, it's a parameter
+                parameters.add(var)
+
+        # Cache results for future calls
+        QUERY_PARAMETERS[query_id] = parameters
+        
+        # Remove from in-progress set now that we're done with this branch
+        in_progress.remove(query_id)
+        
+        return parameters
+
     names = get_used_parameters(base_queries_by_name, queries_by_id, query_id)
     return [(p, parameters_by_name[p]["kind"].lower()) for p in sorted(names) if p not in ('_startTime', '_endTime')] \
          + [(p, "datetime") for p in sorted(names, reverse=True) if p in ('_startTime', '_endTime')]
@@ -178,7 +203,7 @@ def generate_yaml_function(bq_name, query_text, query_parameters, datasource_nam
     
     return '\n'.join(yaml_lines)
 
-def extract_kusto_queries(
+def extract(
         dashboard_file_path, 
         output_folder='extracted',
         function_folder='extracted',
@@ -248,12 +273,11 @@ def extract_kusto_queries(
         datasource_name = datasources_by_id[datasource_id]["name"]
         
         # what parameters do we need for this query?
-        query_parameters = get_parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, query_id)
-
-        # Get the query text and used variables
+        query_parameters = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, query_id)
         query_text = query.get('text', '')
 
-        # replace any used variables in this query with a function call
+        # Build a version of the query text where base queries are replaced with function calls
+        query_text_with_functions = str(query_text)
         for var in query.get('usedVariables', []):
             if var not in base_queries_by_name:
                 continue
@@ -263,44 +287,48 @@ def extract_kusto_queries(
                 continue
 
             # Replace variable with function call
-            sig = function_signature(var, get_parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id))
-            query_text = query_text.replace(var, sig)
+            sig = function_signature(var, parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id))
+            query_text_with_functions = query_text_with_functions.replace(var, sig)
 
         # Get query name from variable name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
         
         # generate the output contents
-        datasource_folder = output_path
         def save(path, content):
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, 'w') as f:
                 f.write(content)
+                if not content.endswith('\n'):
+                    f.write('\n')  # Ensure the file ends with a newline
 
+        # functions
         final_text = generate_kusto_function(
             bq_name=bq_name,
-            query_text=query_text,
+            query_text=query_text_with_functions,
             query_parameters=query_parameters,
             datasource_name=datasource_name,
             function_folder=function_folder
         )
-        save(datasource_folder / "functions" / f"create_{bq_name}.kql", final_text)
+        save(output_path / "functions" / f"create_{bq_name}.kql", final_text)
 
+        # yaml functions
         final_text = generate_yaml_function(
             bq_name=bq_name,
-            query_text=query_text,
+            query_text=query_text_with_functions,
             query_parameters=query_parameters,
             datasource_name=datasource_name,
             function_folder=function_folder
         )
-        save(datasource_folder / "yaml" / f"{bq_name}.yaml", final_text)
-            
+        save(output_path / "yaml" / f"{bq_name}.yaml", final_text)
+        
+        # raw queries
         final_text = generate_kusto_query(
             bq_name=bq_name,
             query_text=query_text,
             query_parameters=query_parameters,
             datasource_name=datasource_name
         )
-        save(datasource_folder / "queries" / f"{bq_name}.kusto", final_text)
+        save(output_path / "queries" / f"{bq_name}.kusto", final_text)
     
         processed_count += 1
     print(f"Extracted {processed_count} base queries from dashboard '{dashboard_file_path}' into '{output_folder}'")
@@ -310,13 +338,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract Kusto queries from Azure Data Explorer dashboard export")
     parser.add_argument("dashboard_file", help="Path to the dashboard JSON file")
     parser.add_argument("--output", "-o", default="extracted", help="Where to save the extracted queries")
-    parser.add_argument("--functions", "-f", action="store_true", help="Generate Kusto functions instead of queries")
-    parser.add_argument("--yaml", "-y", action="store_true", help="Generate functions in YAML format")
     parser.add_argument("--function_folder", "-ff", default="extracted", help="Where to create functions in the kusto database's /functions dir")
     args = parser.parse_args()
     
-    extract_kusto_queries(
+    extract(
         args.dashboard_file, 
         args.output,
-        function_folder=args.function_folder
+        args.function_folder
     )
