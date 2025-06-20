@@ -452,6 +452,10 @@ def generate_report(
 
 if __name__ == "__main__":
     try:
+        # Check if gh CLI is installed
+        if not shutil.which("gh"):
+            raise RuntimeError("GitHub CLI (gh) not found. Please install it: https://cli.github.com/")
+
         # Set up argument parser
         parser = argparse.ArgumentParser(description="Generate a report of GitHub sub-issues")
         parser.add_argument("issues", nargs="+", help="The 'parent' GitHub issue URLs to search for sub-issues")
