@@ -31,16 +31,15 @@ def enable_logging(enabled=True, debug=False):
             handler.setLevel(logging.INFO)
             logger.debug("Logging enabled")
 
-def get_issues(project_url, query=None, field_values=None):
+def get_issues(project_url, field_values=None):
     """Search for GitHub issues using a query string and filter to only issues in the specified project.
     
     Args:
-        query: The GitHub search query
         project_url: The URL of the GitHub project to filter issues by. Project can contain issues from multiple repos.
         field_values: Optional dictionary of project field values to filter by {field_name: field_value}
         
     Returns:
-        List of GitHub issue URLs matching the query and belonging to the specified project
+        List of GitHub issue URLs belonging to the specified project
         
     Note:
         Logging is disabled by default. Use the --verbose flag when running this script
