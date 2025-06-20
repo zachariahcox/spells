@@ -9,6 +9,15 @@ import sys
 import datetime
 import traceback
 import argparse
+import logging
+
+# Set up logger
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(sys.stderr)
+formatter = logging.Formatter('%(levelname)s: %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)  # Default to INFO level
 
 # Default configuration values
 DEFAULT_SHOW_PARENT = False  # Parent column is not shown by default
@@ -21,6 +30,17 @@ STATUS_LABELS = {
     "high risk": "🔴", 
     "inactive": "⚪", 
 }
+
+def log_json(data, message=None):
+    """Helper function to log JSON data during debugging"""
+    if logger.level <= logging.DEBUG:
+        if message:
+            logger.debug(message)
+        try:
+            logger.debug(json.dumps(data, indent=2))
+        except Exception as e:
+            logger.debug(f"Could not format JSON: {e}")
+            logger.debug(str(data))
 
 def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
     """Extract repository name and issue number from a GitHub issue URL."""
@@ -54,7 +74,9 @@ def get_target_date_from_comments(
             "--paginate",
             f"{api_endpoint}?sort=created&direction=desc&per_page=100"
         ]
+        logger.debug(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logger.debug(f"Command completed with exit code: {result.returncode}")
         # Paginated results might come as arrays on separate lines
         try:
             content = result.stdout
@@ -70,7 +92,7 @@ def get_target_date_from_comments(
             else:
                 comments = json.loads(content)
         except json.JSONDecodeError as e:
-            print(f"Error parsing comments JSON: {e}")
+            logger.error(f"Error parsing comments JSON: {e}")
             comments = []
         
         # Sort comments by creation date (newest first)
@@ -79,24 +101,28 @@ def get_target_date_from_comments(
         # Look for Target Date in the HTML comments format - search through all comments from newest to oldest
         target_date_pattern = r'<!-- data key="target_date" start -->\s*(.*?)\s*<!-- data end -->'
         
+        logger.debug(f"Searching for target date in {len(comments)} comments for {repo}#{issue_number}")
+        
         # Check all comments starting with the most recent one
         for comment in comments:
             body = comment.get("body", "")
+            logger.debug(f"Checking comment from {comment.get('created_at', 'unknown date')}")
             match = re.search(target_date_pattern, body, re.DOTALL)
             if match:
                 target_date = match.group(1).strip()
                 comment_timestamp = comment.get("created_at")
                 comment_url = comment.get("html_url") # Get the URL to the comment
+                logger.debug(f"Found target date '{target_date}' in comment {comment_url}")
                 return target_date, comment_timestamp, comment_url
         
         return None, None, None
     except subprocess.CalledProcessError as e:
-        print(f"Error getting comments for {repo}#{issue_number}: {e}")
+        logger.error(f"Error getting comments for {repo}#{issue_number}: {e}")
         if hasattr(e, 'stderr'):
-            print(f"stderr: {e.stderr}")
+            logger.error(f"stderr: {e.stderr}")
         return None, None, None
     except json.JSONDecodeError:
-        print(f"Error decoding comments JSON for {repo}#{issue_number}")
+        logger.error(f"Error decoding comments JSON for {repo}#{issue_number}")
         return None, None, None
 
 def get_sub_issues(
@@ -129,9 +155,12 @@ def get_sub_issues(
             "-H", "X-GitHub-Api-Version: 2022-11-28",
             api_endpoint
         ]
-
+        
+        logger.debug(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logger.debug(f"Command completed with exit code: {result.returncode}")
         sub_issues_data = json.loads(result.stdout)
+        log_json(sub_issues_data, f"Sub-issues data for {repo}#{issue_number}:")
         
         # For each sub-issue, fetch full details to get labels
         sub_issues = []
@@ -146,10 +175,13 @@ def get_sub_issues(
             
             # Only proceed if we have valid information
             if sub_repo and sub_issue_number:
-                print(f"  - Found: https://github.com/{sub_repo}/issues/{sub_issue_number}")
+                logger.info(f"  - Found: https://github.com/{sub_repo}/issues/{sub_issue_number}")
                 cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state,closedAt"]
+                logger.debug(f"Running command: {' '.join(cmd)}")
                 sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                logger.debug(f"Command completed with exit code: {sub_result.returncode}")
                 detailed_sub_issue = json.loads(sub_result.stdout)
+                log_json(detailed_sub_issue, f"Detailed sub-issue data for {sub_repo}#{sub_issue_number}:")
                 target_date, comment_timestamp, comment_url = get_target_date_from_comments(sub_repo, sub_issue_number)
                 detailed_sub_issue["target_date"] = target_date if target_date else "N/A"
                 detailed_sub_issue["last_updated_at"] = comment_timestamp if comment_timestamp else "N/A"
@@ -161,13 +193,14 @@ def get_sub_issues(
                 
                 sub_issues.append(detailed_sub_issue)
             else:
-                print(f"  - Warning: Incomplete sub-issue data: {sub_issue}")
+                logger.warning(f"  - Incomplete sub-issue data: {sub_issue}")
         
         return sub_issues
         
     except subprocess.CalledProcessError as e:
-        print(f"Error getting sub-issues for {repo}#{issue_number}: {e}")
-        print(f"stderr: {e.stderr}")
+        logger.error(f"Error getting sub-issues for {repo}#{issue_number}: {e}")
+        if hasattr(e, 'stderr'):
+            logger.error(f"stderr: {e.stderr}")
         return []
 
 def format_timestamp_with_days_ago(
@@ -215,7 +248,7 @@ def format_timestamp_with_days_ago(
         display_text = f"{date_str}{days_text}"
         return f"[{display_text}]({comment_url})"
     except (ValueError, TypeError) as e:
-        print(f"Warning: Could not format timestamp '{timestamp}': {e}")
+        logger.warning(f"Could not format timestamp '{timestamp}': {e}")
         return timestamp  # Return the original string if parsing fails
 
 def render_markdown_report(
@@ -269,7 +302,7 @@ def render_markdown_report(
                 if update_date < since:
                     continue
             except (ValueError, TypeError) as e:
-                print(f"Warning: Could not parse date '{timestamp}': {e}")
+                logger.warning(f"Could not parse date '{timestamp}': {e}")
                 continue  # Skip if we can't parse the date
         filtered_issues.append(issue)
     
@@ -357,16 +390,16 @@ def generate_report(
     """
     # Check if gh CLI is available and authenticated
     if not shutil.which("gh"):
-        print("Error: GitHub CLI (gh) not found.")
-        print("Please install it from: https://cli.github.com/")
+        logger.error("GitHub CLI (gh) not found.")
+        logger.error("Please install it from: https://cli.github.com/")
         return
     
     try:
         # Quick check to see if gh is authenticated
         subprocess.run(["gh", "auth", "status"], capture_output=True, check=True)
     except subprocess.CalledProcessError:
-        print("Error: Not authenticated with GitHub CLI.")
-        print("Please run: gh auth login")
+        logger.error("Not authenticated with GitHub CLI.")
+        logger.error("Please run: gh auth login")
         return
     
     all_sub_issues = []
@@ -375,36 +408,38 @@ def generate_report(
     for issue_url in issues:
         try:
             repo, issue_number = extract_repo_and_issue_number(issue_url)
-            print(f"Processing {issue_url}...")
+            logger.info(f"Processing {issue_url}...")
             
             # Fetch parent issue details
             parent_url = issue_url
             parent_title = f"{repo}#{issue_number}"
             try:
                 cmd = ["gh", "issue", "view", issue_number, "--repo", repo, "--json", "url,title"]
+                logger.debug(f"Running command: {' '.join(cmd)}")
                 parent_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
                 parent_details = json.loads(parent_result.stdout)
+                log_json(parent_details, f"Parent issue details for {repo}#{issue_number}:")
                 parent_title = parent_details.get("title", f"{repo}#{issue_number}")
                 parent_url = parent_details.get("url", issue_url) # use this in case there was a redirect.
             except Exception as e:
-                print(f"  Warning: Could not fetch details for {issue_url}")
+                logger.warning(f"  Could not fetch details for {issue_url}: {e}")
                 continue
             
             sub_issues = get_sub_issues(repo, issue_number, parent_url, parent_title)
             all_sub_issues.extend(sub_issues)
             
-            print(f"  Found {len(sub_issues)} sub-issues")
+            logger.info(f"  Found {len(sub_issues)} sub-issues")
         except Exception as e:
-            print(f"Error processing {issue_url}: {e}")
+            logger.error(f"Error processing {issue_url}: {e}")
             # More detailed error output for debugging
-            print(f"Exception type: {type(e).__name__}")
-            print(f"Exception args: {e.args}")
+            logger.debug(f"Exception type: {type(e).__name__}")
+            logger.debug(f"Exception args: {e.args}")
             if isinstance(e, subprocess.CalledProcessError) and hasattr(e, 'stderr'):
-                print(f"stderr: {e.stderr}")
-            print(traceback.format_exc())
+                logger.debug(f"stderr: {e.stderr}")
+            logger.debug(traceback.format_exc())
     
     if not all_sub_issues:
-        print("  No sub-issues found.")
+        logger.warning("  No sub-issues found.")
         return
     
     # Check the labels to determine the status of each issue
@@ -445,9 +480,11 @@ def generate_report(
                 f.write(markdown_report)
             
         except IOError as e:
-            print(f"Error writing to file {output_file}: {e}")
+            logger.error(f"Error writing to file {output_file}: {e}")
+            # Still print the report to stdout for user to see
             print(markdown_report)  # Fallback to console output
     else:
+        # Actual report output goes to stdout
         print(markdown_report)
 
 if __name__ == "__main__":
@@ -458,36 +495,70 @@ if __name__ == "__main__":
 
         # Set up argument parser
         parser = argparse.ArgumentParser(description="Generate a report of GitHub sub-issues")
-        parser.add_argument("issues", nargs="+", help="The 'parent' GitHub issue URLs to search for sub-issues")
+        parser.add_argument("issues", nargs="*", help="The 'parent' GitHub issue URLs to search for sub-issues")
         parser.add_argument("--include-parent", action="store_true", help="Include parent column in the report")
         parser.add_argument("--since", type=str, help="Only include issues updated on or after this date (YYYY-MM-DD)")
         parser.add_argument("--output-file", "-o", type=str, help="Write the markdown report to this file instead of standard output")
         parser.add_argument("--individual", "-i", action="store_true", help="Generate a separate report for each provided issue")
+        parser.add_argument("--stdin", "-s", action="store_true", help="Read issue URLs from standard input (one per line)")
+        parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+        parser.add_argument("--debug", "-d", action="store_true", help="Enable debug output (implies verbose)")
+        parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
         
         args = parser.parse_args()
+        
+        # Configure logging based on command line options
+        if args.debug:
+            logger.setLevel(logging.DEBUG)
+        elif args.verbose:
+            logger.setLevel(logging.INFO)
+        elif args.quiet:
+            logger.setLevel(logging.ERROR)
+        else:
+            logger.setLevel(logging.WARNING)
 
+        # Collect issue URLs from arguments and/or stdin
+        issue_urls = args.issues.copy() if args.issues else []
+        
+        # Read from stdin if explicitly requested with --stdin flag or if no issue URLs provided
+        if args.stdin or (not issue_urls and not sys.stdin.isatty()):
+            # Read issue URLs from stdin (one per line)
+            logger.info("Reading issue URLs from stdin...")
+            for line in sys.stdin:
+                url = line.strip()
+                if url:  # Skip empty lines
+                    issue_urls.append(url)
+        
+        # Ensure we have at least one issue URL to process
+        if not issue_urls:
+            parser.print_help()
+            logger.error("No issue URLs provided. Specify them as arguments or use --stdin to read from standard input.")
+            sys.exit(1)
+            
+        logger.info(f"Processing {len(issue_urls)} issues...")
+            
         # Parse the since date if provided
         since = None
         if args.since:
             try:
                 since = datetime.datetime.fromisoformat(args.since)
-                print(f"Filtering issues updated after {since}")
+                logger.info(f"Filtering issues updated after {since}")
             except ValueError:
-                print(f"Warning: Invalid date format '{args.since}'. Expected YYYY-MM-DD.")
+                logger.error(f"Invalid date format '{args.since}'. Expected YYYY-MM-DD.")
                 sys.exit(1)
 
         # If output file exists and we're about to generate separate reports, remove it first
         if args.output_file and os.path.exists(args.output_file):
             try:
                 os.remove(args.output_file)
-                print(f"Removed existing file: {args.output_file}")
+                logger.info(f"Removed existing file: {args.output_file}")
             except OSError as e:
-                print(f"Warning: Could not remove existing file {args.output_file}: {e}")
+                logger.warning(f"Could not remove existing file {args.output_file}: {e}")
             
 
         # Check if the separate reports mode is enabled
         if args.individual:
-            for issue_url in args.issues:
+            for issue_url in issue_urls:
                 generate_report(
                     issues=[issue_url],  # Pass a single issue as a list
                     show_parent=args.include_parent,
@@ -497,13 +568,17 @@ if __name__ == "__main__":
         else:
             # Generate a combined report with all issues (default behavior)
             generate_report(
-                issues=args.issues,
+                issues=issue_urls,
                 show_parent=args.include_parent,
                 since=since,
                 output_file=args.output_file
             )
 
     except KeyboardInterrupt:
-        print("\nOperation canceled by user.")
+        logger.warning("\nOperation canceled by user.")
         sys.exit(0)
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        logger.debug(traceback.format_exc())
+        sys.exit(1)
 
