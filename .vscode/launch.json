@@ -18,7 +18,6 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "https://github.com/orgs/github/projects/21571", "--field", "RoB Area FY25Q4", "Repos"
             ]
         },
         {
