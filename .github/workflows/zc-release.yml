@@ -50,8 +50,10 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build portable kit
+      - name: Build zip and push release
         if: steps.check_release.outputs.exists != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd go/encrypt
           make portable
@@ -61,17 +63,9 @@ jobs:
           cd ..
           echo "Created ZIP archive: zc-${VERSION}.zip"
 
-      - name: Create Release
-        if: steps.check_release.outputs.exists != 'true'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          TAG_VERSION="v${VERSION}"
-
           # Create release notes
           cat > release_notes.md << EOF
-          zc folder encryption kit $TAG_VERSION
+          zc folder encryption kit $VERSION
           
           This release contains the portable kit of ZC, a tool for securely encrypting folders and files.
     
@@ -79,6 +73,7 @@ jobs:
           EOF
           
           # Create the release with GitHub CLI
+          TAG_VERSION="v${VERSION}"
           gh release create "$TAG_VERSION" \
             --title "zc folder encryption kit $TAG_VERSION" \
             --notes-file release_notes.md \
