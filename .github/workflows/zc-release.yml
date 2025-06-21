@@ -24,9 +24,11 @@ jobs:
       - name: Extract version
         id: get_version
         run: |
+          cd go/encrypt
           VERSION=$(grep "const tool_version" main.go | cut -d'"' -f2)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version extracted: ${VERSION}"
+          cd ../..
 
       - name: Check if release already exists
         id: check_release
