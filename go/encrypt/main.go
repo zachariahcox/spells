@@ -372,6 +372,14 @@ func cli(args []string) error {
 	if strings.HasSuffix(filename, ".enc") {
 		log.Println("Decrypting file...")
 		output := strings.TrimSuffix(filename, ".enc")
+
+		// Check if the output directory already exists
+		if _, err := os.Stat(output); err == nil {
+			return fmt.Errorf("output directory already exists: %s", output)
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("error checking output directory: %v", err)
+		}
+
 		zipFile := filepath.Join(temp, filepath.Base(output))
 		if err := decryptFile(filename, zipFile, password); err != nil {
 			return fmt.Errorf("error decrypting file: %v", err)

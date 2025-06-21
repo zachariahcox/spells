@@ -116,78 +116,93 @@ See the LICENSE file for details.
 
 You can create a portable emergency kit on a USB drive that includes both your encrypted data and the tools to decrypt it on any computer.
 
-### Step-by-Step Instructions
+### Automated Creation (Recommended)
 
-1. Build binaries for all supported platforms:
+Use the provided `portable` make target to automatically create a complete emergency kit:
 
-   ```bash
-   make build
-   ```
+```bash
+make portable
+```
 
-2. Create a directory structure on your USB drive:
+This will:
 
-   ```bash
-   mkdir -p /path/to/usb/zc/{linux,windows,macos,data}
-   ```
+1. Build all binaries for all supported platforms
+2. Create a `portable` directory with the full emergency kit structure
+3. Copy all necessary files to the correct locations
+4. Set appropriate permissions for executable files
+5. Create a user-friendly README.txt file
 
-3. Copy the appropriate binaries to each platform folder:
+After running this command, simply copy the contents of the `portable` directory to your USB drive:
 
-   ```bash
-   # Copy Linux binaries
-   mkdir -p /path/to/usb/zc/linux/amd64 /path/to/usb/zc/linux/arm64
-   cp build/linux/amd64/zc /path/to/usb/zc/linux/amd64/
-   cp build/linux/arm64/zc /path/to/usb/zc/linux/arm64/
-   
-   # Copy Windows binary
-   mkdir -p /path/to/usb/zc/windows/amd64
-   cp build/windows/amd64/zc.exe /path/to/usb/zc/windows/amd64/
-   
-   # Copy macOS binaries
-   mkdir -p /path/to/usb/zc/macos/amd64 /path/to/usb/zc/macos/arm64
-   cp build/darwin/amd64/zc /path/to/usb/zc/macos/amd64/
-   cp build/darwin/arm64/zc /path/to/usb/zc/macos/arm64/
-   ```
+```bash
+cp -r portable/zc/* /path/to/usb/
+```
 
-4. Add a README with instructions:
-
-   ```bash
-   cat > /path/to/usb/zc/README.txt << 'EOF'
-   ZC Emergency Kit Instructions:
-   
-   1. Choose the binary for your operating system and architecture:
-      - Linux (Intel/AMD): Use linux/amd64/zc
-      - Linux (ARM): Use linux/arm64/zc
-      - Windows: Use windows/amd64/zc.exe
-      - macOS (Intel): Use macos/amd64/zc
-      - macOS (Apple Silicon): Use macos/arm64/zc
-   
-   2. To decrypt data, run:
-      - Linux/macOS: ./zc data/your-encrypted-file.enc
-      - Windows: zc.exe data\your-encrypted-file.enc
-   EOF
-   ```
-
-5. Encrypt your important data:
-
-   ```bash
-   # First, organize your important files in a folder
-   mkdir -p ~/emergency-data
-   cp /path/to/important/documents ~/emergency-data/
-   
-   # Encrypt the folder
-   ./zc ~/emergency-data
-   
-   # Copy the encrypted file to your USB drive
-   cp ~/emergency-data.enc /path/to/usb/zc/data/
-   ```
+Then add your encrypted data to the `data` folder on the USB drive.
 
 ### Using the Emergency Kit
 
-On any computer with your USB drive:
+The emergency kit includes easy-to-use scripts in the `tools` directory that make decryption simple, even for users who aren't comfortable with the command line.
+
+#### For Command-Line Users
+
+If you're comfortable with the command line:
 
 1. Open a terminal/command prompt
-2. Navigate to the appropriate platform directory on your USB
-3. Run the zc tool to decrypt your data
-4. Enter your password when prompted
+2. Navigate to the appropriate binary directory for your system:
+   - **Linux (Intel/AMD)**: `/path/to/usb/zc/linux/amd64/`
+   - **Linux (ARM)**: `/path/to/usb/zc/linux/arm64/`
+   - **macOS (Intel)**: `/Volumes/YOUR_USB_NAME/zc/macos/amd64/`
+   - **macOS (Apple Silicon)**: `/Volumes/YOUR_USB_NAME/zc/macos/arm64/`
+   - **Windows**: `D:\zc\windows\amd64\` (replace D: with your USB drive letter)
+3. Run the zc tool with your encrypted file:
+   - **Linux/macOS**: `./zc ../../data/your-encrypted-file.enc`
+   - **Windows**: `zc.exe ..\..\data\your-encrypted-file.enc`
 
-This ensures you can access your critical data on any operating system, without needing to install the tool or have internet access.
+#### For Non-Command-Line Users
+
+For those who prefer a more user-friendly approach, we provide clickable scripts:
+
+##### Windows Users
+
+1. Navigate to the `tools` folder on your USB drive
+2. Double-click the `decrypt.bat` file
+3. When prompted, either:
+   - Type the full path to your encrypted file, or
+   - Drag and drop your encrypted file into the command window
+4. Enter your password when prompted
+5. Your files will be extracted to the same directory as the zc.exe program
+
+##### macOS Users
+
+1. Navigate to the `tools` folder on your USB drive
+2. Double-click the `decrypt.command` file
+   - If you get a security warning, right-click the file, choose "Open", then click "Open" in the dialog
+3. When prompted, enter the path to your encrypted file
+4. Enter your password when prompted
+5. Your files will be extracted to the macOS binary directory
+
+##### Linux Users
+
+1. Navigate to the `tools` folder on your USB drive
+2. Right-click on `decrypt.sh` and select "Run as Program" or "Execute"
+3. When prompted, enter the path to your encrypted file
+4. Enter your password when prompted
+5. Your files will be extracted to the Linux binary directory
+
+#### Troubleshooting
+
+- **Windows Security Warning**: If you see "Windows protected your PC":
+  - Click "More info"
+  - Click "Run anyway"
+
+- **macOS Security Warning**: If macOS prevents opening the script:
+  - Open System Preferences > Security & Privacy
+  - Click "Open Anyway" for the blocked script
+
+- **Linux Permission Error**: If you get "Permission denied":
+  - Open a terminal
+  - Run `chmod +x /path/to/usb/tools/decrypt.sh`
+
+- **Output Directory Already Exists**: If you get an error about the output directory already existing:
+  - Rename or move the existing directory before decrypting
