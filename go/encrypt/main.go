@@ -303,34 +303,34 @@ func unzipFolder(zipFileName, folder string) error {
 func cli(args []string) error {
 	// check args
 	if len(args) != 1 {
-		return fmt.Errorf("Usage: %s <folder name or file that ends in .enc>", tool_name)
+		return fmt.Errorf("usage: %s <folder name or file that ends in .enc>", tool_name)
 	}
 
 	// argument must be a directory or a file that ends with .enc
 	filename := args[0]
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
-		return fmt.Errorf("File does not exist: %s", filename)
+		return fmt.Errorf("file does not exist: %s", filename)
 	}
 	if !fileInfo.IsDir() && !strings.HasSuffix(filename, ".enc") {
-		return fmt.Errorf("File is not a directory, and doesn't have a '%s' extension: %s", filename, tool_ext)
+		return fmt.Errorf("file is not a directory, and doesn't have a '%s' extension: %s", filename, tool_ext)
 	}
 
 	// make temp dir in the current directory to prevent leaks into the real temp dir
 	wd, err := filepath.Abs(filepath.Dir(filename))
 	if err != nil {
-		return fmt.Errorf("Error getting current directory: %v", err)
+		return fmt.Errorf("error getting current directory: %v", err)
 	}
 	temp, err := os.MkdirTemp(wd, "temp")
 	if err != nil {
-		return fmt.Errorf("Error creating temp directory: %v", err)
+		return fmt.Errorf("error creating temp directory: %v", err)
 	}
 	defer os.RemoveAll(temp) // clean up temp directory
 
 	// collect password
 	password, err := getPassword("Enter password: ")
 	if err != nil {
-		return fmt.Errorf("Error reading password: %v", err)
+		return fmt.Errorf("error reading password: %v", err)
 	}
 	defer zeroBytes(password)
 
@@ -340,11 +340,11 @@ func cli(args []string) error {
 		output := strings.TrimSuffix(filename, ".enc")
 		zipFile := filepath.Join(temp, filepath.Base(output))
 		if err := decryptFile(filename, zipFile, password); err != nil {
-			return fmt.Errorf("Error decrypting file: %v", err)
+			return fmt.Errorf("error decrypting file: %v", err)
 		}
 		log.Println("Unzipping file...")
 		if err := unzipFolder(zipFile, wd); err != nil {
-			return fmt.Errorf("Error unzipping file: %v", err)
+			return fmt.Errorf("error unzipping file: %v", err)
 		}
 	} else {
 		// seal
@@ -352,16 +352,17 @@ func cli(args []string) error {
 		output := filename + ".enc"
 		zipFile := filepath.Join(temp, filepath.Base(output))
 		if err := zipFolder(filename, zipFile); err != nil {
-			return fmt.Errorf("Error zipping folder: %v", err)
+			return fmt.Errorf("error zipping folder: %v", err)
 		}
 		log.Println("Encrypting file...")
 		if err := encryptFile(zipFile, output, password); err != nil {
-			return fmt.Errorf("Error encrypting file: %v", err)
+			return fmt.Errorf("error encrypting file: %v", err)
 		}
 	}
 	log.Println("Done!")
 	return nil
 }
+
 func main() {
 	if err := cli(os.Args[1:]); err != nil {
 		log.Fatal(err)
