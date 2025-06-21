@@ -1,16 +1,81 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-// func TestCLI(t *testing.T) {
-// 	generateTestFiles("test_folder", 5)
-// 	work([]string{"test_folder"})
-// }
+// Capture stdout helper function
+func captureOutput(f func()) string {
+	// Keep backup of the real stdout
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	// Execute the function
+	f()
+
+	// Close the writer and restore stdout
+	w.Close()
+	os.Stdout = oldStdout
+
+	// Read the output from the reader
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	return buf.String()
+}
+
+func TestHelpOption(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-h"}, "Usage: " + tool_name},
+		{[]string{"--help"}, "Usage: " + tool_name},
+		{[]string{}, "Usage: " + tool_name}, // No args should show help
+	}
+
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			output := captureOutput(func() {
+				cli(tt.args)
+			})
+			if !strings.Contains(output, tt.want) {
+				t.Errorf("cli(%v) output = %q, want to contain %q", tt.args, output, tt.want)
+			}
+			// Verify help content
+			if !strings.Contains(output, "Options:") || !strings.Contains(output, "Description:") {
+				t.Errorf("Help output missing expected sections")
+			}
+		})
+	}
+}
+
+func TestVersionOption(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-v"}, tool_name + " version " + tool_version},
+		{[]string{"--version"}, tool_name + " version " + tool_version},
+	}
+
+	for _, tt := range tests {
+		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
+			output := captureOutput(func() {
+				cli(tt.args)
+			})
+			if !strings.Contains(output, tt.want) {
+				t.Errorf("cli(%v) output = %q, want to contain %q", tt.args, output, tt.want)
+			}
+		})
+	}
+}
 
 func TestEncryptAndDecrypt(t *testing.T) {
 	password := []byte("mysecretpassword")

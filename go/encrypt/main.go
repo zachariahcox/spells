@@ -19,6 +19,7 @@ import (
 // config for scrypt
 const tool_name = "zc"
 const tool_ext = ".enc"
+const tool_version = "1.0.0"
 const scrypt_N = 1048576 // 2**20
 const scrypt_r = 8
 const scrypt_p = 1
@@ -300,8 +301,40 @@ func unzipFolder(zipFileName, folder string) error {
 	return nil
 }
 
+func printHelp() {
+	fmt.Printf("Usage: %s [options] <folder name or file that ends in %s>\n\n", tool_name, tool_ext)
+	fmt.Printf("Options:\n")
+	fmt.Printf("  -h, --help     Show this help message and exit\n")
+	fmt.Printf("  -v, --version  Show version information and exit\n\n")
+	fmt.Printf("Description:\n")
+	fmt.Printf("  This tool provides simple file encryption and decryption.\n")
+	fmt.Printf("  - To encrypt a folder: %s <folder_name>\n", tool_name)
+	fmt.Printf("  - To decrypt a file: %s <filename%s>\n", tool_name, tool_ext)
+}
+
+func printVersion() {
+	fmt.Printf("%s version %s\n", tool_name, tool_version)
+}
+
 func cli(args []string) error {
 	// check args
+	if len(args) == 0 {
+		printHelp()
+		return nil
+	}
+
+	// Check for help or version flags
+	if args[0] == "-h" || args[0] == "--help" {
+		printHelp()
+		return nil
+	}
+
+	if args[0] == "-v" || args[0] == "--version" {
+		printVersion()
+		return nil
+	}
+
+	// check for arguments
 	if len(args) != 1 {
 		return fmt.Errorf("usage: %s <folder name or file that ends in .enc>", tool_name)
 	}
@@ -365,6 +398,8 @@ func cli(args []string) error {
 
 func main() {
 	if err := cli(os.Args[1:]); err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Run '%s --help' for usage information.\n", tool_name)
+		os.Exit(1)
 	}
 }
