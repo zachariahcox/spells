@@ -1,0 +1,61 @@
+name: release zc folder encryption kit
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (v1.0.0, v2.0.1, etc.)
+
+permissions:
+  contents: write  # Needed for creating releases
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1  # Get full history for proper versioning
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.18'  # Ensure we're using a compatible version
+
+      - name: Extract version
+        id: get_version
+        run: |
+          VERSION=$(grep "const tool_version" main.go | cut -d'"' -f2)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version extracted: ${VERSION}"
+
+      - name: Build portable kit
+        run: make portable
+      
+      - name: Create ZIP archive
+        run: |
+          cd portable
+          zip -r "../zc-portable-${{ steps.get_version.outputs.version }}.zip" ./*
+          cd ..
+          echo "Created ZIP archive: zc-portable-${{ steps.get_version.outputs.version }}.zip"
+      
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          # Create release notes
+          cat > release_notes.md << EOF
+          zc folder encryption kit v${VERSION}
+          
+          This release contains the portable kit of ZC, a tool for securely encrypting folders and files.
+    
+          For full instructions, see the README.md file included in the package.
+          EOF
+          
+          # Create the release with GitHub CLI
+          gh release create "v${VERSION}" \
+            --title "zc folder encryption kit v${VERSION}" \
+            --notes-file release_notes.md \
+            "zc-portable-${VERSION}.zip"
