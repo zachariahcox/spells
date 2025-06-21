@@ -15,9 +15,9 @@ echo
 
 # Change to the appropriate architecture directory based on the system architecture
 if [[ $(uname -m) == "aarch64" ]]; then
-    cd "$DIR/../linux/arm64"
+    cd "$DIR/tools/linux/arm64"
 else
-    cd "$DIR/../linux/amd64"
+    cd "$DIR/tools/linux/amd64"
 fi
 
 chmod +x ./zc

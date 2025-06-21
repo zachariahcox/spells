@@ -10,7 +10,7 @@ echo.
 echo Starting decryption process...
 echo.
 
-cd /d %~dp0\..\windows\amd64
+cd /d %~dp0\tools\windows\amd64
 zc.exe %FILE_TO_DECRYPT%
 
 echo.

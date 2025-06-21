@@ -18,10 +18,10 @@ echo
 
 # Change to the appropriate architecture directory
 if [[ $(uname -m) == "arm64" ]]; then
-    cd "$DIR/../darwin/arm64"
+    cd "$DIR/tools/darwin/arm64"
     chmod +x ./zc
 else
-    cd "$DIR/../darwin/amd64"
+    cd "$DIR/tools/darwin/amd64"
     chmod +x ./zc
 fi
 
