@@ -56,9 +56,10 @@ jobs:
           cd go/encrypt
           make portable
           cd portable
-          zip -r "../zc-${{ steps.get_version.outputs.version }}.zip" ./*
+          VERSION="${{ steps.get_version.outputs.version }}"
+          zip -r "../zc-${VERSION}.zip" ./*
           cd ..
-          echo "Created ZIP archive: zc-${{ steps.get_version.outputs.version }}.zip"
+          echo "Created ZIP archive: zc-${VERSION}.zip"
 
       - name: Create Release
         if: steps.check_release.outputs.exists != 'true'
