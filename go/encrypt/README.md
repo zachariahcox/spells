@@ -11,7 +11,74 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 - Uses secure password-based encryption with scrypt for key derivation
 - Handles the complete process of zipping, encrypting, decrypting, and unzipping
 
-## Installation
+### Using the Emergency Kit
+
+The emergency kit includes easy-to-use scripts in the `tools` directory that make decryption simple, even for users who aren't comfortable with the command line.
+
+#### For Command-Line Users
+
+If you're comfortable with the command line:
+
+1. Open a terminal/command prompt
+2. Navigate to the appropriate binary directory for your system:
+   - **Linux (Intel/AMD)**: `/path/to/usb/portable/tools/linux/amd64/`
+   - **Linux (ARM)**: `/path/to/usb/portable/tools/linux/arm64/`
+   - **macOS (Intel)**: `/Volumes/YOUR_USB_NAME/portable/tools/darwin/amd64/`
+   - **macOS (Apple Silicon)**: `/Volumes/YOUR_USB_NAME/portable/tools/darwin/arm64/`
+   - **Windows**: `D:\portable\tools\windows\amd64\` (replace D: with your USB drive letter)
+3. Run the zc tool with your encrypted file:
+   - **Linux/macOS**: `./zc ../../data/your-encrypted-file.enc`
+   - **Windows**: `zc.exe ..\..\data\your-encrypted-file.enc`
+
+#### For Non-Command-Line Users
+
+For those who prefer a more user-friendly approach, we provide clickable scripts:
+
+##### Windows Users
+
+1. Navigate to the `tools` folder on your USB drive
+2. Double-click the `decrypt.bat` file
+3. When prompted, either:
+   - Type the full path to your encrypted file, or
+   - Drag and drop your encrypted file into the command window
+4. Enter your password when prompted
+5. Your files will be extracted to the same directory as the zc.exe program
+
+##### macOS Users
+
+1. Navigate to the `tools` folder on your USB drive
+2. Double-click the `decrypt.command` file
+   - If you get a security warning, right-click the file, choose "Open", then click "Open" in the dialog
+3. When prompted, enter the path to your encrypted file
+4. Enter your password when prompted
+5. Your files will be extracted to the darwin binary directory
+
+##### Linux Users
+
+1. Navigate to the `tools` folder on your USB drive
+2. Right-click on `decrypt.sh` and select "Run as Program" or "Execute"
+3. When prompted, enter the path to your encrypted file
+4. Enter your password when prompted
+5. Your files will be extracted to the Linux binary directory
+
+#### Troubleshooting
+
+- **Windows Security Warning**: If you see "Windows protected your PC":
+  - Click "More info"
+  - Click "Run anyway"
+
+- **macOS Security Warning**: If macOS prevents opening the script:
+  - Open System Preferences > Security & Privacy
+  - Click "Open Anyway" for the blocked script
+
+- **Linux Permission Error**: If you get "Permission denied":
+  - Open a terminal
+  - Run `chmod +x /path/to/usb/tools/decrypt.sh`
+
+- **Output Directory Already Exists**: If you get an error about the output directory already existing:
+  - Rename or move the existing directory before decrypting
+
+## Building and Installing ZC
 
 ### Prerequisites
 
@@ -46,7 +113,7 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 
 ### Encrypting a Folder
 
-```bash
+   ```bash
 zc /path/to/folder
 ```
 
@@ -108,15 +175,9 @@ make uninstall
 - Memory zeroing for sensitive data
 - Random salt (32 bytes) and nonce (12 bytes) generation
 
-## License
-
-See the LICENSE file for details.
-
 ## Creating an Emergency Kit on a Jump Drive
 
 You can create a portable emergency kit on a USB drive that includes both your encrypted data and the tools to decrypt it on any computer.
-
-### Automated Creation (Recommended)
 
 Use the provided `portable` make target to automatically create a complete emergency kit:
 
@@ -132,77 +193,36 @@ This will:
 4. Set appropriate permissions for executable files
 5. Create a user-friendly README.txt file
 
-After running this command, simply copy the contents of the `portable` directory to your USB drive:
+After running this command, simply copy the contents of the `portable` directory to your USB drive. This will create the tooling for your emergency kit.
 
 ```bash
 cp -r portable/zc/* /path/to/usb/
 ```
 
-Then add your encrypted data to the `data` folder on the USB drive.
+Create the data for your emergency kit by running the `zc` tool to encrypt your files.
+Copy the resulting encrypted file to your USB.
 
-### Using the Emergency Kit
+You'll end up with the following folder structure on your USB drive:
 
-The emergency kit includes easy-to-use scripts in the `tools` directory that make decryption simple, even for users who aren't comfortable with the command line.
-
-#### For Command-Line Users
-
-If you're comfortable with the command line:
-
-1. Open a terminal/command prompt
-2. Navigate to the appropriate binary directory for your system:
-   - **Linux (Intel/AMD)**: `/path/to/usb/zc/linux/amd64/`
-   - **Linux (ARM)**: `/path/to/usb/zc/linux/arm64/`
-   - **macOS (Intel)**: `/Volumes/YOUR_USB_NAME/zc/macos/amd64/`
-   - **macOS (Apple Silicon)**: `/Volumes/YOUR_USB_NAME/zc/macos/arm64/`
-   - **Windows**: `D:\zc\windows\amd64\` (replace D: with your USB drive letter)
-3. Run the zc tool with your encrypted file:
-   - **Linux/macOS**: `./zc ../../data/your-encrypted-file.enc`
-   - **Windows**: `zc.exe ..\..\data\your-encrypted-file.enc`
-
-#### For Non-Command-Line Users
-
-For those who prefer a more user-friendly approach, we provide clickable scripts:
-
-##### Windows Users
-
-1. Navigate to the `tools` folder on your USB drive
-2. Double-click the `decrypt.bat` file
-3. When prompted, either:
-   - Type the full path to your encrypted file, or
-   - Drag and drop your encrypted file into the command window
-4. Enter your password when prompted
-5. Your files will be extracted to the same directory as the zc.exe program
-
-##### macOS Users
-
-1. Navigate to the `tools` folder on your USB drive
-2. Double-click the `decrypt.command` file
-   - If you get a security warning, right-click the file, choose "Open", then click "Open" in the dialog
-3. When prompted, enter the path to your encrypted file
-4. Enter your password when prompted
-5. Your files will be extracted to the macOS binary directory
-
-##### Linux Users
-
-1. Navigate to the `tools` folder on your USB drive
-2. Right-click on `decrypt.sh` and select "Run as Program" or "Execute"
-3. When prompted, enter the path to your encrypted file
-4. Enter your password when prompted
-5. Your files will be extracted to the Linux binary directory
-
-#### Troubleshooting
-
-- **Windows Security Warning**: If you see "Windows protected your PC":
-  - Click "More info"
-  - Click "Run anyway"
-
-- **macOS Security Warning**: If macOS prevents opening the script:
-  - Open System Preferences > Security & Privacy
-  - Click "Open Anyway" for the blocked script
-
-- **Linux Permission Error**: If you get "Permission denied":
-  - Open a terminal
-  - Run `chmod +x /path/to/usb/tools/decrypt.sh`
-
-- **Output Directory Already Exists**: If you get an error about the output directory already existing:
-  - Rename or move the existing directory before decrypting
+```bash
+portable/
+├── your-encrypted-file.enc
+├── README.md
+├── decrypt.bat
+├── decrypt.command
+├── decrypt.sh
+├── tools
+│   ├── linux
+│   │   ├── amd64
+│   │   │   └── zc
+│   │   └── arm64
+│   │       └── zc
+│   ├── darwin
+│   │   ├── amd64
+│   │   │   └── zc
+│   │   └── arm64
+│   │       └── zc
+│   └── windows
+│       └── amd64
+│           └── zc.exe
+```
