@@ -307,7 +307,7 @@ func printHelp() {
 	fmt.Printf("  -h, --help     Show this help message and exit\n")
 	fmt.Printf("  -v, --version  Show version information and exit\n\n")
 	fmt.Printf("Description:\n")
-	fmt.Printf("  This tool provides simple file encryption and decryption.\n")
+	fmt.Printf("  Provides compression of a folder, encryption and decryption.\n")
 	fmt.Printf("  - To encrypt a folder: %s <folder_name>\n", tool_name)
 	fmt.Printf("  - To decrypt a file: %s <filename%s>\n", tool_name, tool_ext)
 }
@@ -350,6 +350,7 @@ func cli(args []string) error {
 	}
 
 	// make temp dir in the current directory to prevent leaks into the real temp dir
+	filename = filepath.Clean(filename) // make sure it doesn't end in a slash
 	wd, err := filepath.Abs(filepath.Dir(filename))
 	if err != nil {
 		return fmt.Errorf("error getting current directory: %v", err)
@@ -380,7 +381,6 @@ func cli(args []string) error {
 			return fmt.Errorf("error unzipping file: %v", err)
 		}
 	} else {
-		// seal
 		log.Println("Zipping folder...")
 		output := filename + ".enc"
 		zipFile := filepath.Join(temp, filepath.Base(output))
