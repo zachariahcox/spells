@@ -71,7 +71,7 @@ jobs:
 
           # Create release notes
           cat > release_notes.md << EOF
-          This release contains the portable kit of `zc`, a tool for securely encrypting folders and files.
+          This release contains the portable kit of zc, a tool for securely encrypting folders and files.
     
           For full instructions, see the README.md file included in the package.
           EOF
