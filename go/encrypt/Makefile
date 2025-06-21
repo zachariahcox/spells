@@ -14,6 +14,7 @@ OS_ARCHES := linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -rf $(PORTABLE_DIR)
 
 build:
 	@for os_arch in $(OS_ARCHES); do \
