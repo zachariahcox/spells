@@ -1,6 +1,4 @@
-# zc - Zip and Encrypt Tool
-
-A simple command-line tool for securely encrypting folders and files using AES-256 encryption with scrypt key derivation.
+# zc - a stand-alone zip and encrypt tool
 
 ## Overview
 
@@ -9,7 +7,7 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 - Encrypts directories by first zipping them, then applying AES-256 encryption
 - Decrypts and extracts previously encrypted files and directories
 - Uses secure password-based encryption with scrypt for key derivation
-- Handles the complete process of zipping, encrypting, decrypting, and unzipping
+- Requires no other dependencies or tools. 
 
 ### Using the Emergency Kit
 
@@ -68,7 +66,7 @@ This is your encrypted file.
 
 #### For Command-Line Users
 
-If you're comfortable with the command line, you'll find the self-contained `zc` binary in the `tools` directory for your platform.
+If you're comfortable with the command line, you'll find the self-contained `zc` binary for your platform in the `tools` directory.
 
 1. Open a terminal/command prompt
 1. Navigate to the appropriate binary directory for your system:
@@ -89,7 +87,7 @@ If you're comfortable with the command line, you'll find the self-contained `zc`
 
 - **Linux Permission Error**: If you get "Permission denied":
   - Open a terminal
-  - Run `chmod +x /path/to/usb/tools/decrypt.sh`
+  - Run `chmod +x /path/to/usb/emergency-kit/decrypt.sh`
 
 - **Output Directory Already Exists**: If you get an error about the output directory already existing:
   - Rename or move the existing directory before decrypting
@@ -150,7 +148,7 @@ This will:
 
 1. Prompt you for the password
 2. Decrypt the file
-3. Unzip the contents to the current directory
+3. Unzip the contents next to the encrypted file
 
 ## Development
 
@@ -195,50 +193,18 @@ make uninstall
 
 You can create a portable emergency kit on a USB drive that includes both your encrypted data and the tools to decrypt it on any computer.
 
-Use the provided `portable` make target to automatically create a complete emergency kit:
+Use the provided `kit` make target to generate the correct layout:
 
 ```bash
-make portable
+make kit
 ```
 
 This will:
 
 1. Build all binaries for all supported platforms
-2. Create a `portable` directory with the full emergency kit structure
+2. Create a `emergency-kit` directory with the full emergency kit structure
 3. Copy all necessary files to the correct locations
 4. Set appropriate permissions for executable files
-5. Create a user-friendly README.txt file
+5. Create a user-friendly README file
 
-After running this command, simply copy the contents of the `portable` directory to your USB drive. This will create the tooling for your emergency kit.
-
-```bash
-cp -r portable/zc/* /path/to/usb/
-```
-
-Create the data for your emergency kit by running the `zc` tool to encrypt your files.
-Copy the resulting encrypted file to your USB.
-
-You'll end up with the following folder structure on your USB drive:
-
-```bash
-portable/
-├── your-encrypted-file.enc
-├── README.md
-├── decrypt.bat
-├── decrypt.command
-├── decrypt.sh
-├── tools
-│   ├── linux
-│   │   ├── amd64
-│   │   │   └── zc
-│   │   └── arm64
-│   │       └── zc
-│   ├── darwin
-│   │   ├── amd64
-│   │   │   └── zc
-│   │   └── arm64
-│   │       └── zc
-│   └── windows
-│       └── amd64
-│           └── zc.exe
-```
+After running this command, copy the contents of the directory to your USB drive next to your encrypted files.
