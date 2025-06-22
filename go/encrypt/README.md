@@ -1,4 +1,4 @@
-# ZC - Zip and Encrypt Tool
+# zc - Zip and Encrypt Tool
 
 A simple command-line tool for securely encrypting folders and files using AES-256 encryption with scrypt key derivation.
 
@@ -13,53 +13,70 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 
 ### Using the Emergency Kit
 
-The emergency kit includes easy-to-use scripts in the `tools` directory that make decryption simple, even for users who aren't comfortable with the command line.
+The layout of your emergency kit probaly looks like this:
+
+```bash
+<your folder name here>/
+├── your-encrypted-file.enc
+├── README.md
+├── decrypt.bat
+├── decrypt.command
+├── decrypt.sh
+├── tools
+│   ├── linux
+│   │   ├── amd64
+│   │   │   └── zc
+│   │   └── arm64
+│   │       └── zc
+│   ├── darwin
+│   │   ├── amd64
+│   │   │   └── zc
+│   │   └── arm64
+│   │       └── zc
+│   └── windows
+│       └── amd64
+│           └── zc.exe
+```
+
+Look for a file that ends with `.enc`.
+This is your encrypted file.
+
+Look for those `decrypt` files next to this README -- you're about to click one of them!
+
+#### Windows Users
+
+1. Double-click the `decrypt.bat` file
+1. When prompted, either:
+   - Type the full path to your encrypted file, or
+   - Drag and drop your encrypted file into the command window
+1. Enter your password when prompted
+1. Your files will be extracted to the same directory as the `.enc` file
+
+#### macOS Users
+
+1. Double-click the `decrypt.command` file
+   - If you get a security warning, right-click the file, choose "Open", then click "Open" in the dialog
+1. When prompted, enter the path to your encrypted file
+1. Enter your password when prompted
+1. Your files will be extracted to the same directory as the `.enc` file
+
+#### Linux Users
+
+1. Right-click on `decrypt.sh` and select "Run as Program" or "Execute"
+1. When prompted, enter the path to your encrypted file
+1. Enter your password when prompted
+1. Your files will be extracted to the same directory as the `.enc` file
 
 #### For Command-Line Users
 
-If you're comfortable with the command line:
+If you're comfortable with the command line, you'll find the self-contained `zc` binary in the `tools` directory for your platform.
 
 1. Open a terminal/command prompt
-2. Navigate to the appropriate binary directory for your system:
-   - **Linux (Intel/AMD)**: `/path/to/usb/portable/tools/linux/amd64/`
-   - **Linux (ARM)**: `/path/to/usb/portable/tools/linux/arm64/`
-   - **macOS (Intel)**: `/Volumes/YOUR_USB_NAME/portable/tools/darwin/amd64/`
-   - **macOS (Apple Silicon)**: `/Volumes/YOUR_USB_NAME/portable/tools/darwin/arm64/`
-   - **Windows**: `D:\portable\tools\windows\amd64\` (replace D: with your USB drive letter)
-3. Run the zc tool with your encrypted file:
+1. Navigate to the appropriate binary directory for your system:
+1. Run the zc tool with your encrypted file:
    - **Linux/macOS**: `./zc ../../data/your-encrypted-file.enc`
    - **Windows**: `zc.exe ..\..\data\your-encrypted-file.enc`
-
-#### For Non-Command-Line Users
-
-For those who prefer a more user-friendly approach, we provide clickable scripts:
-
-##### Windows Users
-
-1. Navigate to the `tools` folder on your USB drive
-2. Double-click the `decrypt.bat` file
-3. When prompted, either:
-   - Type the full path to your encrypted file, or
-   - Drag and drop your encrypted file into the command window
-4. Enter your password when prompted
-5. Your files will be extracted to the same directory as the zc.exe program
-
-##### macOS Users
-
-1. Navigate to the `tools` folder on your USB drive
-2. Double-click the `decrypt.command` file
-   - If you get a security warning, right-click the file, choose "Open", then click "Open" in the dialog
-3. When prompted, enter the path to your encrypted file
-4. Enter your password when prompted
-5. Your files will be extracted to the darwin binary directory
-
-##### Linux Users
-
-1. Navigate to the `tools` folder on your USB drive
-2. Right-click on `decrypt.sh` and select "Run as Program" or "Execute"
-3. When prompted, enter the path to your encrypted file
-4. Enter your password when prompted
-5. Your files will be extracted to the Linux binary directory
+1. Your files will be extracted to the same directory as the `.enc` file
 
 #### Troubleshooting
 

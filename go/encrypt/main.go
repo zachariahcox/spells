@@ -260,41 +260,44 @@ func unzipFolder(zipFileName, folder string) error {
 
 	// Extract files from the zip file into the specified folder
 	for _, zf := range zipReader.File {
-		filePath := filepath.Join(folder, zf.Name)
+		// Convert the zip entry name to a platform-specific path by splitting on '/' and rejoining
+		// This handles the case where zip files always use '/' as separator regardless of platform
+		entryParts := strings.Split(zf.Name, "/")
+		cleanedEntryPath := filepath.Join(entryParts...)
+		path := filepath.Join(folder, cleanedEntryPath)
 
 		// fail if theres a path traversal attack (no escaping into parent directories)
-		if !strings.HasPrefix(filepath.Clean(filePath), filepath.Clean(folder)+string(os.PathSeparator)) {
-			return fmt.Errorf("%s is not located in %s", filePath, folder)
+		if !strings.HasPrefix(filepath.Clean(path), filepath.Clean(folder)+string(os.PathSeparator)) {
+			return fmt.Errorf("%s is not located in %s", path, folder)
 		}
 
 		if zf.FileInfo().IsDir() {
-			// Create directories
-			os.MkdirAll(filePath, os.ModePerm)
-		} else {
-			// Create a file
-			if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-				return err
-			}
+			// Skip directory entries - we'll create necessary directories when extracting files
+			continue
+		}
+		// Create a file (and its parent directories)
+		if err := os.MkdirAll(filepath.Dir(path), os.ModePerm); err != nil {
+			return err
+		}
 
-			outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zf.Mode())
-			if err != nil {
-				return err
-			}
+		outFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, zf.Mode())
+		if err != nil {
+			return err
+		}
 
-			rc, err := zf.Open()
-			if err != nil {
-				return err
-			}
+		rc, err := zf.Open()
+		if err != nil {
+			return err
+		}
 
-			_, err = io.Copy(outFile, rc)
+		_, err = io.Copy(outFile, rc)
 
-			// Close the file without defer to close before next iteration of loop
-			outFile.Close()
-			rc.Close()
+		// Close the file without defer to close before next iteration of loop
+		outFile.Close()
+		rc.Close()
 
-			if err != nil {
-				return err
-			}
+		if err != nil {
+			return err
 		}
 	}
 

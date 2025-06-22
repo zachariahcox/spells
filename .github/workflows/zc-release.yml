@@ -11,9 +11,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
-      contents: read
-      attestations: write
+      id-token: write # Needed for the attestations step
+      contents: write # Needed for creating releases
+      attestations: write # Needed for creating attestations
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
