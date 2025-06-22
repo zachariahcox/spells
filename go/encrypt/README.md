@@ -16,32 +16,31 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 The layout of your emergency kit probaly looks like this:
 
 ```bash
-<your folder name here>/
 ├── your-encrypted-file.enc
-├── README.md
-├── decrypt.bat
-├── decrypt.command
-├── decrypt.sh
-├── tools
-│   ├── linux
-│   │   ├── amd64
-│   │   │   └── zc
-│   │   └── arm64
-│   │       └── zc
-│   ├── darwin
-│   │   ├── amd64
-│   │   │   └── zc
-│   │   └── arm64
-│   │       └── zc
-│   └── windows
-│       └── amd64
-│           └── zc.exe
+├── emergency-kit/
+│   ├── README.md
+│   ├── decrypt.bat
+│   ├── decrypt.command
+│   ├── decrypt.sh
+│   ├── tools
+│   │   ├── linux
+│   │   │   └── amd64
+│   │   │       └── zc
+│   │   │   └── arm64
+│   │   │       └── zc
+│   │   ├── darwin
+│   │   │   └── amd64
+│   │   │       └── zc
+│   │   |   └── arm64
+│   │   |       └── zc
+│   │   ├── windows
+│   |   |   └── amd64
+│   |   |       └── zc.exe
 ```
 
-Look for a file that ends with `.enc`.
+* Look for a file on your USB drive that ends with `.enc`.
 This is your encrypted file.
-
-Look for those `decrypt` files next to this README -- you're about to click one of them!
+* Look for those `decrypt` files next to this README -- you're about to click one of them!
 
 #### Windows Users
 

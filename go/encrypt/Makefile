@@ -5,7 +5,7 @@ BUILD_DATE := $(shell date "$(DATE_FMT)")
 BUILD_FLAGS := "-w -s -X 'main.Version=$(VERSION)' -X 'main.BuildDate=$(BUILD_DATE)'"
 BUILD_DIR := $(CURDIR)/build
 INSTALL_DIR := ~
-PORTABLE_DIR := $(CURDIR)/portable
+PORTABLE_DIR := $(CURDIR)/emergency-kit
 GO_FILES := $(shell find . -name '*.go' -not -path "./vendor/*")
 OS_ARCHES := linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64
 

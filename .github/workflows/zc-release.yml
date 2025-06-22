@@ -85,8 +85,60 @@ jobs:
           echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
             
       - name: Attest
+        id: attest
         uses: actions/attest@v2
         with:
           subject-path: '${{ steps.create_artifact.outputs.artifact_name }}'
-          predicate-type: 'https://example.com/predicate/v1'
-          predicate: '{}'
+          predicate-type: 'https://slsa.dev/provenance/v1'
+          predicate-path: 'provenance.json'
+          output-path: 'attestation.json'
+          
+      - name: Upload Attestation as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: attestation
+          path: attestation.json
+          
+      - name: Upload Attestation to release
+        if: steps.check_release.outputs.exists != 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          TAG_VERSION="v${VERSION}"
+          
+          # Create attestation files for the release
+          cp attestation.json "zc-${VERSION}.attestation.json"
+          cp provenance.json "zc-${VERSION}.provenance.json"
+          
+          # Create a human-readable summary
+          echo "ZC Folder Encryption Kit v${VERSION} - Build Attestation" > "zc-${VERSION}.attestation-summary.txt"
+          echo "========================================================" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "Created: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "Build ID: ${{ github.run_id }}" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "Workflow: ${{ github.workflow }}" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "Repository: ${{ github.repository }}" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "Commit: ${{ github.sha }}" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "This attestation provides cryptographic verification that the release" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "artifact was built from the specified source code in a secure and" >> "zc-${VERSION}.attestation-summary.txt"
+          echo "reproducible manner." >> "zc-${VERSION}.attestation-summary.txt"
+          
+          # Create SHA256 checksum for the artifact
+          ARTIFACT_NAME="${{ steps.create_artifact.outputs.artifact_name }}"
+          sha256sum "$ARTIFACT_NAME" > "$ARTIFACT_NAME.sha256"
+          
+          # Upload attestation files to the release
+          echo "Uploading attestation files to release ${TAG_VERSION}..."
+          
+          # Verify the release exists before uploading
+          if gh release view "$TAG_VERSION" &> /dev/null; then
+            gh release upload "$TAG_VERSION" "zc-${VERSION}.attestation.json" --clobber
+            gh release upload "$TAG_VERSION" "zc-${VERSION}.provenance.json" --clobber
+            gh release upload "$TAG_VERSION" "zc-${VERSION}.attestation-summary.txt" --clobber
+            gh release upload "$TAG_VERSION" "$ARTIFACT_NAME.sha256" --clobber
+            echo "Successfully uploaded attestation files to release ${TAG_VERSION}"
+          else
+            echo "Error: Release ${TAG_VERSION} not found. Cannot upload attestation files."
+            exit 1
+          fi
