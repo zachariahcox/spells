@@ -89,7 +89,6 @@ jobs:
         with:
           subject-path: '${{ steps.create_artifact.outputs.artifact_name }}'
           predicate-type: 'https://slsa.dev/provenance/v1'
-          predicate-path: 'provenance.json'
           output-path: 'attestation.json'
           attest-type: 'https://slsa.dev/provenance/v1'
           
