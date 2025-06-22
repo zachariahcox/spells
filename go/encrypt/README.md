@@ -13,7 +13,7 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 
 ### Using the Emergency Kit
 
-The layout of your emergency kit probaly looks like this:
+The layout of your emergency kit probably looks like this:
 
 ```bash
 ├── your-encrypted-file.enc
