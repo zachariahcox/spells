@@ -59,8 +59,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd go/encrypt
-          make portable
-          cd portable
+          make emergency-kit
+          cd emergency-kit
           VERSION="${{ steps.get_version.outputs.version }}"
           ARTIFACT_NAME="zc-${VERSION}.zip"
           zip -r "../../../${ARTIFACT_NAME}" ./*
@@ -69,8 +69,7 @@ jobs:
 
           # Create release notes
           cat > release_notes.md << EOF
-          This release contains the portable kit of zc, a tool for securely encrypting folders and files.
-    
+          This is a pre-built emergency-kit based on zc, a self-contained tool for encrypting folders and files.
           For full instructions, see the README.md file included in the package.
           EOF
           
