@@ -92,12 +92,7 @@ jobs:
           predicate-type: 'https://slsa.dev/provenance/v1'
           predicate-path: 'provenance.json'
           output-path: 'attestation.json'
-          
-      - name: Upload Attestation as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: attestation
-          path: attestation.json
+          attest-type: 'https://slsa.dev/provenance/v1'
           
       - name: Upload Attestation to release
         if: steps.check_release.outputs.exists != 'true'
