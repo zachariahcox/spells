@@ -16,14 +16,7 @@ jobs:
       attestations: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.18'  # Ensure we're using a compatible version
+        uses: actions/checkout@v4
 
       - name: Extract version
         id: get_version
@@ -54,8 +47,13 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.18'  # Ensure we're using a compatible version
+
       - name: Build zip and push release
-        id: build
+        id: create_artifact
         if: steps.check_release.outputs.exists != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,9 +62,9 @@ jobs:
           make portable
           cd portable
           VERSION="${{ steps.get_version.outputs.version }}"
-          ARTIFACT_NAME="${{ github.workspace }}/zc-${VERSION}.zip"
-          zip -r "${ARTIFACT_NAME}" ./*
-          cd ..
+          ARTIFACT_NAME="zc-${VERSION}.zip"
+          zip -r "../../../${ARTIFACT_NAME}" ./*
+          cd ../../..
           echo "Created ZIP archive: ${ARTIFACT_NAME}"
 
           # Create release notes
@@ -76,6 +74,8 @@ jobs:
           For full instructions, see the README.md file included in the package.
           EOF
           
+          ls -la
+
           # Create the release with GitHub CLI
           TAG_VERSION="v${VERSION}"
           gh release create "$TAG_VERSION" \
@@ -87,6 +87,6 @@ jobs:
       - name: Attest
         uses: actions/attest@v2
         with:
-          subject-path: '${{ steps.build.outputs.artifact_name }}'
+          subject-path: '${{ steps.create_artifact.outputs.artifact_name }}'
           predicate-type: 'https://example.com/predicate/v1'
           predicate: '{}'

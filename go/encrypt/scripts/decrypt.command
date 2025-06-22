@@ -6,7 +6,7 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 echo "ZC Decryption Tool"
 echo "------------------"
 echo
-echo "Please enter the path to your encrypted file:"
+echo "Please enter the path to your encrypted file (or drag and drop the file here):"
 read FILE_TO_DECRYPT
 
 # Remove quotes if present
