@@ -5,16 +5,16 @@ BUILD_DATE := $(shell date "$(DATE_FMT)")
 BUILD_FLAGS := "-w -s -X 'main.Version=$(VERSION)' -X 'main.BuildDate=$(BUILD_DATE)'"
 BUILD_DIR := $(CURDIR)/build
 INSTALL_DIR := ~
-PORTABLE_DIR := $(CURDIR)/emergency-kit
+KIT_DIR := $(CURDIR)/emergency-kit
 GO_FILES := $(shell find . -name '*.go' -not -path "./vendor/*")
 OS_ARCHES := linux/amd64 linux/arm64 windows/amd64 darwin/amd64 darwin/arm64
 
 # build these rules even if files with the same name exist.
-.PHONY: build clean test install uninstall portable
+.PHONY: build clean test install uninstall kit
 
 clean:
 	rm -rf $(BUILD_DIR)
-	rm -rf $(PORTABLE_DIR)
+	rm -rf $(KIT_DIR)
 
 build:
 	@for os_arch in $(OS_ARCHES); do \
@@ -46,18 +46,15 @@ uninstall:
 	echo "rm -f $$local_bin_name";\
 	rm -f $$local_bin_name
 
-# Create a portable version with all necessary components
-portable: build
-	@echo "Creating portable kit..."
-	@rm -rf $(PORTABLE_DIR)
-	@mkdir -p $(PORTABLE_DIR)
-	@cp $(CURDIR)/README.md $(PORTABLE_DIR)/README.md
-	@mkdir -p $(PORTABLE_DIR)/tools
-	@cp -r $(BUILD_DIR)/* $(PORTABLE_DIR)/tools
-	@cp -r $(CURDIR)/scripts/* $(PORTABLE_DIR)
-	@chmod +x $(PORTABLE_DIR)/decrypt.command
-	@chmod +x $(PORTABLE_DIR)/decrypt.sh
-	@echo "Portable kit created at $(PORTABLE_DIR)"
-	@echo "You can copy the contents of the 'portable' directory to your USB drive or other media."
-	@echo "To use it, copy your encrypted files to the 'portable/data' directory."
+# Create a emergency-kit version with all necessary components
+kit: build
+	@rm -rf $(KIT_DIR)
+	@mkdir -p $(KIT_DIR)
+	@cp $(CURDIR)/README.md $(KIT_DIR)/README.md
+	@mkdir -p $(KIT_DIR)/tools
+	@cp -r $(BUILD_DIR)/* $(KIT_DIR)/tools
+	@cp -r $(CURDIR)/scripts/* $(KIT_DIR)
+	@chmod +x $(KIT_DIR)/decrypt.command
+	@chmod +x $(KIT_DIR)/decrypt.sh
+	@echo "Kit created at $(KIT_DIR)"
 
