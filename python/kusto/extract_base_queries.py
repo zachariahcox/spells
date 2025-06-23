@@ -323,7 +323,7 @@ def extract(
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
         # Use the snake_case name if available
         function_name = snake_names.get(bq_name, bq_name)
-        timestamp = datetime.now().strftime('%Y-%m-%dT%H:00:00Z')  # Only to the hour
+        timestamp = datetime.now().strftime('%Y-%m-%d')  # Only to the hour
         docstring=f"{bq_name} exported from dashboard {dashboard_title} on {timestamp}"
 
         # generate the output contents
