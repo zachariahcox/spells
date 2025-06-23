@@ -192,23 +192,23 @@ def generate_yaml_function(
         docstring, 
         function_folder
         ):
-    # Format the query body to maintain proper indentation
-    # Strip any leading/trailing whitespace and ensure consistent line endings
-    query_body = query_text.strip()
-    
-    # Process parameters if they exist
-    params = ','.join([f"{p}:{p_type}" for p, p_type in query_parameters]) if query_parameters else ''
-    
     # Build the YAML document
     yaml_lines = [
         f"name: {bq_name}",
         f"folder: {function_folder}",
         f"docString: {docstring}",
-        f"parameters: {params}",
-        "body: |-"
+        f"preformatted: true", # should be preformatted to work with KustoSchemaTools https://github.com/github/KustoSchemaTools
     ]
+
+    # Reference parameters if needed
+    params = ','.join([f"{p}:{p_type}" for p, p_type in query_parameters]) if query_parameters else ''
+    if params:
+        yaml_lines.append(f"parameters: {params}")
     
-    # Add indented query body with proper YAML block scalar formatting
+    # Format the query body to maintain proper indentation
+    # Strip any leading/trailing whitespace and ensure consistent line endings
+    query_body = query_text.strip()
+    yaml_lines.append("body: |-")
     for line in query_body.split('\n'):
         yaml_lines.append(f"  {line}")
     
