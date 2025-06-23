@@ -194,10 +194,9 @@ def generate_yaml_function(
         ):
     # Build the YAML document
     yaml_lines = [
-        f"name: {bq_name}",
         f"folder: {function_folder}",
         f"docString: {docstring}",
-        f"preformatted: true", # should be preformatted to work with KustoSchemaTools https://github.com/github/KustoSchemaTools
+        # f"preformatted: true", # should be preformatted to work with KustoSchemaTools https://github.com/github/KustoSchemaTools
     ]
 
     # Reference parameters if needed
