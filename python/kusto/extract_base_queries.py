@@ -353,7 +353,7 @@ def extract(
             docstring=docstring,
             function_folder=function_folder
         )
-        save(output_path / "yaml" / f"{function_name}.yaml", final_text)
+        save(output_path / "yaml" / f"{function_name}.yml", final_text)
         
         # bq-style raw queries
         final_text = generate_kusto_query(
