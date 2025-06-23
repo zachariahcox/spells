@@ -8,6 +8,7 @@ Usage: extract_base_queries.py [-h] [--output OUTPUT] [--function_folder FUNCTIO
 """
 import json
 from pathlib import Path
+import re
 from typing import Dict, Set
 from datetime import datetime
 
@@ -213,6 +214,18 @@ def generate_yaml_function(
     
     return '\n'.join(yaml_lines)
 
+def camel_to_snake(name):
+    # Handle acronyms like HTTP, CSV, API, etc. by converting them to Http, Csv, Api
+    acronym_pattern = re.compile(r'([A-Z])([A-Z]+)')
+    name = acronym_pattern.sub(lambda m: m.group(1) + m.group(2).lower(), name)
+    
+    # Remove existing underscores if they exist
+    name = name.replace('_', '')
+
+    # Insert underscores between camelCase boundaries
+    name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
 def extract(
         dashboard_file_path, 
         output_folder='extracted',
@@ -257,15 +270,23 @@ def extract(
     for datasource in dashboard.get('dataSources', []):
         datasources_by_id[datasource['id']] = datasource
     
-    # Map all parameters by their variable name for lookup
     for param in dashboard.get('parameters', []):
         if 'variableName' in param:
             parameters_by_name[param['variableName']] = param
         
+    # Generate new names for base queries
+    snake_names = {}
+    for bq_name, bq in base_queries_by_name.items():
+        # replace prefixes 
+        name_without_prefix = bq_name.replace('BQ', function_folder.lower())
+
+        # convert to snake_case
+        snake_names[bq_name] = camel_to_snake(name_without_prefix)
+
     # Keep track of what we've processed
     processed_count = 0
 
-    # Process each base query
+    # Extract each base query
     for base_query_id, base_query in base_queries_by_id.items():
         query_id = base_query.get('queryId')
         if not query_id or query_id not in queries_by_id:
@@ -294,13 +315,16 @@ def extract(
             if not bq_query_id:
                 continue
 
-            # Replace variable with function call
-            sig = function_signature(function_name, parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id))
+            # Replace variable with function call using snake_case name
+            snake_case_func_name = snake_names.get(function_name, function_name)
+            sig = function_signature(snake_case_func_name, parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id))
             query_text_with_functions = query_text_with_functions.replace(function_name, sig)
 
         # Get query name from variable name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
-        timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        # Use the snake_case name if available
+        function_name = snake_names.get(bq_name, bq_name)
+        timestamp = datetime.now().strftime('%Y-%m-%dT%H:00:00Z')  # Only to the hour
         docstring=f"{bq_name} exported from dashboard {dashboard_title} on {timestamp}"
 
         # generate the output contents
@@ -313,31 +337,31 @@ def extract(
 
         # functions
         final_text = generate_kusto_function(
-            bq_name=bq_name,
+            bq_name=function_name,
             query_text=query_text_with_functions,
             query_parameters=query_parameters,
             docstring=docstring,
             function_folder=function_folder
         )
-        save(output_path / "functions" / f"create_{bq_name}.kql", final_text)
+        save(output_path / "functions" / f"create_{function_name}.kql", final_text)
 
         # yaml functions
         final_text = generate_yaml_function(
-            bq_name=bq_name,
+            bq_name=function_name,
             query_text=query_text_with_functions,
             query_parameters=query_parameters,
             docstring=docstring,
             function_folder=function_folder
         )
-        save(output_path / "yaml" / f"{bq_name}.yaml", final_text)
+        save(output_path / "yaml" / f"{function_name}.yaml", final_text)
         
         # bq-style raw queries
         final_text = generate_kusto_query(
-            bq_name=bq_name,
+            bq_name=function_name,
             query_text=query_text,
             query_parameters=query_parameters
         )
-        save(output_path / "queries" / f"{bq_name}.kusto", final_text)
+        save(output_path / "queries" / f"{function_name}.kusto", final_text)
     
         processed_count += 1
     print(f"Extracted {processed_count} base queries from dashboard '{dashboard_file_path}' into '{output_folder}'")
