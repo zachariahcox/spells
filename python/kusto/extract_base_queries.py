@@ -160,21 +160,18 @@ def generate_kusto_query(bq_name, query_text, query_parameters, datasource_name)
     ]
     
     # Build query with components
-    query_lines = [
-        f"// database(\"{datasource_name}\").{bq_name}",
-        "//",
-    ]
-    
+    query_lines = []
+
     # Add parameter initializations if they exist
     if parameter_initializations:
+        query_lines.append(f"// Parameters -- begin")
         query_lines.extend(parameter_initializations)
-        query_lines.append("")  # Empty line for separation
-    
-    query_lines.extend([
-        "//",
-        query_text
-    ])
-    
+        query_lines.append(f"// Parameters -- end")
+        query_lines.append("//")  # Empty line for separation
+        
+    query_lines.append(f"// {bq_name} -- begin")
+    query_lines.append(query_text)
+    query_lines.append(f"// {bq_name} -- end")
     return '\n'.join(query_lines)
 
 def generate_yaml_function(bq_name, query_text, query_parameters, datasource_name, function_folder):
