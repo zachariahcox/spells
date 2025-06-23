@@ -9,6 +9,7 @@ Usage: extract_base_queries.py [-h] [--output OUTPUT] [--function_folder FUNCTIO
 import json
 from pathlib import Path
 from typing import Dict, Set
+from datetime import datetime
 
 # Cache for used parameters to avoid redundant calculations
 QUERY_PARAMETERS: Dict[str, Set[str]] = {}
@@ -131,18 +132,23 @@ def function_signature(
     param_str = ', '.join(name for name, _ in parameters)
     return f"{function_name}({param_str})"
 
-def generate_kusto_function(bq_name, query_text, query_parameters, datasource_name, function_folder):
+def generate_kusto_function(
+        bq_name, 
+        query_text, 
+        query_parameters, 
+        docstring, 
+        function_folder
+        ):
     # Collect parameter information for function declaration
     function_parameters = [f"{p}:{p_type}" for p, p_type in query_parameters]
 
     # Create function docstring with description of parameters
-    func_description = f"Query extracted from '{datasource_name}' dashboard"
     params = "\n    " + ',\n    '.join(function_parameters) + "\n" if function_parameters else ''
 
     # Build the function creation command using list join approach for better readability
     function_lines = [
         f'.create-or-alter function {bq_name} with (',
-        f'  docstring="{func_description}",',
+        f'  docstring="{docstring}",',
         f'  folder="{function_folder}"',
         f')',
         f"{bq_name}({params}){{",
@@ -152,7 +158,11 @@ def generate_kusto_function(bq_name, query_text, query_parameters, datasource_na
     
     return '\n'.join(function_lines)
 
-def generate_kusto_query(bq_name, query_text, query_parameters, datasource_name):
+def generate_kusto_query(
+        bq_name, 
+        query_text, 
+        query_parameters
+        ):
     # Create let statements for parameters
     parameter_initializations = [
         f"let {p} = {KUSTO_DEFAULT_VALUES.get(p_type, 'dynamic(null)')};" 
@@ -174,10 +184,13 @@ def generate_kusto_query(bq_name, query_text, query_parameters, datasource_name)
     query_lines.append(f"// {bq_name} -- end")
     return '\n'.join(query_lines)
 
-def generate_yaml_function(bq_name, query_text, query_parameters, datasource_name, function_folder):
-    # Create function docstring with description of parameters
-    doc_string = f"Query extracted from '{datasource_name}' dashboard"
-    
+def generate_yaml_function(
+        bq_name, 
+        query_text, 
+        query_parameters, 
+        docstring, 
+        function_folder
+        ):
     # Format the query body to maintain proper indentation
     # Strip any leading/trailing whitespace and ensure consistent line endings
     query_body = query_text.strip()
@@ -189,7 +202,7 @@ def generate_yaml_function(bq_name, query_text, query_parameters, datasource_nam
     yaml_lines = [
         f"name: {bq_name}",
         f"folder: {function_folder}",
-        f"docString: {doc_string}",
+        f"docString: {docstring}",
         f"parameters: {params}",
         "body: |-"
     ]
@@ -230,6 +243,7 @@ def extract(
     queries_by_id = {}
     datasources_by_id = {}
     parameters_by_name = {}
+    dashboard_title = dashboard.get('title', 'Unknown Dashboard')
     
     # First, create lookup tables for all elements
     for base_query in dashboard.get('baseQueries', []):
@@ -266,30 +280,29 @@ def extract(
             print(f"Warning: No data source found for query ID {query_id}")
             continue
         
-        # Create folder for this datasource
-        datasource_name = datasources_by_id[datasource_id]["name"]
-        
-        # what parameters do we need for this query?
+        # What parameters do we need for this query?
         query_parameters = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, query_id)
         query_text = query.get('text', '')
 
         # Build a version of the query text where base queries are replaced with function calls
         query_text_with_functions = str(query_text)
-        for var in query.get('usedVariables', []):
-            if var not in base_queries_by_name:
+        for function_name in query.get('usedVariables', []):
+            if function_name not in base_queries_by_name:
                 continue
-            bq = base_queries_by_name[var]
+            bq = base_queries_by_name[function_name]
             bq_query_id = bq.get('queryId')
             if not bq_query_id:
                 continue
 
             # Replace variable with function call
-            sig = function_signature(var, parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id))
-            query_text_with_functions = query_text_with_functions.replace(var, sig)
+            sig = function_signature(function_name, parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id))
+            query_text_with_functions = query_text_with_functions.replace(function_name, sig)
 
         # Get query name from variable name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
-        
+        timestamp = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+        docstring=f"{bq_name} exported from dashboard {dashboard_title} on {timestamp}"
+
         # generate the output contents
         def save(path, content):
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -303,7 +316,7 @@ def extract(
             bq_name=bq_name,
             query_text=query_text_with_functions,
             query_parameters=query_parameters,
-            datasource_name=datasource_name,
+            docstring=docstring,
             function_folder=function_folder
         )
         save(output_path / "functions" / f"create_{bq_name}.kql", final_text)
@@ -313,17 +326,16 @@ def extract(
             bq_name=bq_name,
             query_text=query_text_with_functions,
             query_parameters=query_parameters,
-            datasource_name=datasource_name,
+            docstring=docstring,
             function_folder=function_folder
         )
         save(output_path / "yaml" / f"{bq_name}.yaml", final_text)
         
-        # raw queries
+        # bq-style raw queries
         final_text = generate_kusto_query(
             bq_name=bq_name,
             query_text=query_text,
-            query_parameters=query_parameters,
-            datasource_name=datasource_name
+            query_parameters=query_parameters
         )
         save(output_path / "queries" / f"{bq_name}.kusto", final_text)
     
