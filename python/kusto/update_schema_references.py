@@ -1,8 +1,9 @@
-#!/usr/bin/env python3
 """
-YML Processor CLI
+This script is used to correct references to functions in kusto files by adding a database qualifier.
+For ADE json exports, base queries are in the context of a specific database. 
+If a function is not qualified with the database name, it will not work in a different database context.
 
-This tool processes YML files based on a list of names from an input file.
+This needs to be ported into the generic extract script.
 """
 
 import argparse
