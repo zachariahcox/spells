@@ -229,6 +229,9 @@ def extract(
         dashboard_file_path, 
         output_folder='extracted',
         function_folder='extracted',
+        create_yaml=False,
+        create_functions=False,
+        create_queries=False
         ):
     """
     Extract Kusto queries from Azure Data Explorer dashboard export file.
@@ -236,9 +239,8 @@ def extract(
     Args:
         dashboard_file_path: Path to the dashboard JSON file
         output_folder: Folder to save extracted queries in
-        create_functions: If True, convert each base query into a Kusto function
         function_folder: Folder name to use in the function docstring and creation command
-        create_yaml_functions: If True, generate functions in YAML format instead of KQL
+        yaml_only: Whether to only emit YAML files (no KQL or raw queries)
     """
     # Create output folder if it doesn't exist
     output_path = Path(output_folder)
@@ -334,34 +336,32 @@ def extract(
                 if not content.endswith('\n'):
                     f.write('\n')  # Ensure the file ends with a newline
 
-        # functions
-        final_text = generate_kusto_function(
-            bq_name=function_name,
-            query_text=query_text_with_functions,
-            query_parameters=query_parameters,
-            docstring=docstring,
-            function_folder=function_folder
-        )
-        save(output_path / "functions" / f"create_{function_name}.kql", final_text)
+        if create_functions:
+            final_text = generate_kusto_function(
+                bq_name=function_name,
+                query_text=query_text_with_functions,
+                query_parameters=query_parameters,
+                docstring=docstring,
+                function_folder=function_folder
+            )
+            save(output_path / f"create_{function_name}.kql", final_text)
+        if create_yaml:
+            final_text = generate_yaml_function(
+                bq_name=function_name,
+                query_text=query_text_with_functions,
+                query_parameters=query_parameters,
+                docstring=docstring,
+                function_folder=function_folder
+            )
+            save(output_path / f"{function_name}.yml", final_text)
+        if create_queries:
+            final_text = generate_kusto_query(
+                bq_name=function_name,
+                query_text=query_text,
+                query_parameters=query_parameters
+            )
+            save(output_path / f"{function_name}.kusto", final_text)
 
-        # yaml functions
-        final_text = generate_yaml_function(
-            bq_name=function_name,
-            query_text=query_text_with_functions,
-            query_parameters=query_parameters,
-            docstring=docstring,
-            function_folder=function_folder
-        )
-        save(output_path / "yaml" / f"{function_name}.yml", final_text)
-        
-        # bq-style raw queries
-        final_text = generate_kusto_query(
-            bq_name=function_name,
-            query_text=query_text,
-            query_parameters=query_parameters
-        )
-        save(output_path / "queries" / f"{function_name}.kusto", final_text)
-    
         processed_count += 1
     print(f"Extracted {processed_count} base queries from dashboard '{dashboard_file_path}' into '{output_folder}'")
 
@@ -369,12 +369,18 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description="Extract Kusto queries from Azure Data Explorer dashboard export")
     parser.add_argument("dashboard_file", help="Path to the dashboard JSON file")
-    parser.add_argument("--output", "-o", default="extracted", help="Where to save the extracted queries")
+    parser.add_argument("--output", "-o", default="extracted", help="Where to save output files")
     parser.add_argument("--function_folder", "-ff", default="extracted", help="Where to create functions in the kusto database's /functions dir")
+    parser.add_argument("--yaml", action="store_true", help="Emit YAML files")
+    parser.add_argument("--functions", action="store_true", help="Emit create-or-alter function definition files")
+    parser.add_argument("--queries", action="store_true", help="Emit ADE-style basequery amalgams")
     args = parser.parse_args()
-    
+
     extract(
         args.dashboard_file, 
         args.output,
-        args.function_folder
+        args.function_folder,
+        create_yaml=args.yaml,
+        create_functions=args.functions,
+        create_queries=args.queries
     )
