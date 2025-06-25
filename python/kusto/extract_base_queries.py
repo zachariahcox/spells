@@ -13,6 +13,18 @@ from typing import Dict, Set
 from datetime import datetime
 
 class Parameter(object):
+    KUSTO_DEFAULT_VALUES = {
+        'string': '""',               # Empty string
+        'long': 'long(0)',            # Integer zero
+        'int': 'int(0)',              # Integer zero
+        'real': 'real(0.0)',          # Real zero
+        'double': 'double(0.0)',      # Float zero
+        'boolean': 'false',           # Boolean false
+        'datetime': 'datetime(null)', # Null datetime
+        'timespan': 'timespan(0)',    # Zero timespan
+        'dynamic': 'dynamic(null)'    # Empty dynamic object
+    }
+
     def __init__(self, name: str, 
                  kind: str, 
                  selection_type: str,
@@ -35,19 +47,7 @@ class Parameter(object):
         if self.selection_type != 'scalar':
             return "dynamic(null)" # return dynamic(null) for any list
         
-        KUSTO_DEFAULT_VALUES = {
-            'string': '""',               # Empty string
-            'long': 'long(0)',            # Integer zero
-            'int': 'int(0)',              # Integer zero
-            'real': 'real(0.0)',          # Real zero
-            'double': 'double(0.0)',      # Float zero
-            'boolean': 'false',           # Boolean false
-            'datetime': 'datetime(null)', # Null datetime
-            'timespan': 'timespan(0)',    # Zero timespan
-            'dynamic': 'dynamic(null)'    # Empty dynamic object
-        }
-
-        self._default_value = KUSTO_DEFAULT_VALUES.get(self.kind, 'dynamic(null)')
+        self._default_value = Parameter.KUSTO_DEFAULT_VALUES.get(self.kind, 'dynamic(null)')
         return self._default_value
 
     @default_value.setter
