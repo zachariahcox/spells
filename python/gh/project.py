@@ -455,7 +455,6 @@ if __name__ == "__main__":
         # Set up argument parser
         parser = argparse.ArgumentParser(description="Get GitHub issues from a project with filtering options")
         parser.add_argument("project_url", help="GitHub project URL (org, user, or repo project)")
-        parser.add_argument("--query", "-q", help="GitHub search query to filter issues")
         parser.add_argument("--field", "-f", action="append", nargs=2, metavar=("NAME", "VALUE"), 
                            help="Project field filter in format 'field_name field_value'. Can be used multiple times.")
         parser.add_argument("--output", "-o", help="Output format: 'urls' (default), 'markdown', or 'json'")
@@ -475,7 +474,7 @@ if __name__ == "__main__":
                 field_values[field_name] = field_value
         
         # Get issues with the specified filters
-        issue_urls = get_issues(args.project_url, args.query, field_values)
+        issue_urls = get_issues(args.project_url, field_values)
         
         # Output based on format
         if not issue_urls:
