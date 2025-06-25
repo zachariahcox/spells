@@ -12,37 +12,105 @@ import re
 from typing import Dict, Set
 from datetime import datetime
 
+class Parameter(object):
+    def __init__(self, name: str, 
+                 kind: str, 
+                 selection_type: str,
+                 default_value: str = "",
+                 initializer: str = "",
+                 initialized_name: str = ""
+                 ):
+        self.name = name
+        self.kind = kind
+        self.selection_type = selection_type
+        self.default_value = default_value
+        self.initializer = initializer
+        self.initialized_name = initialized_name
+
+    @property
+    def default_value(self) -> str:
+        if self._default_value:
+            return self._default_value
+
+        if self.selection_type != 'scalar':
+            return "dynamic(null)" # return dynamic(null) for any list
+        
+        KUSTO_DEFAULT_VALUES = {
+            'string': '""',               # Empty string
+            'long': 'long(0)',            # Integer zero
+            'int': 'int(0)',              # Integer zero
+            'real': 'real(0.0)',          # Real zero
+            'double': 'double(0.0)',      # Float zero
+            'boolean': 'false',           # Boolean false
+            'datetime': 'datetime(null)', # Null datetime
+            'timespan': 'timespan(0)',    # Zero timespan
+            'dynamic': 'dynamic(null)'    # Empty dynamic object
+        }
+
+        self._default_value = KUSTO_DEFAULT_VALUES.get(self.kind, 'dynamic(null)')
+        return self._default_value
+
+    @default_value.setter
+    def default_value(self, value: str):
+        self._default_value = value
+  
+    def kind_with_selection(self) -> str:
+        if self.selection_type == 'scalar':
+            return self.kind
+        return 'dynamic'  # For lists, we use dynamic type
+
+    @property
+    def initializer(self) -> str:
+        """
+        Returns a Kusto initializer for this parameter.
+        This is used in the function body to set default values.
+        """
+        if self._initializer:
+            return self._initializer
+        
+        # build a default initializer
+        if self.selection_type == 'scalar':
+            i = f"let {self.name} = {self.default_value};"
+        else:
+            i = f"let {self.name} = dynamic({self.default_value});"
+
+        self._initializer = i
+        return i
+    
+    @initializer.setter
+    def initializer(self, value: str):
+        self._initializer = value
+
+    @property
+    def initialized_name(self) -> str:
+        if self._initialized_name:
+            return self._initialized_name
+        return ""
+    @initialized_name.setter
+    def initialized_name(self, value: str):
+        self._initialized_name = value
+
 # Cache for used parameters to avoid redundant calculations
 QUERY_PARAMETERS: Dict[str, Set[str]] = {}
 
-# What default values to use for each parameter type in Kusto
-KUSTO_DEFAULT_VALUES = {
-    'string': '""',               # Empty string
-    'long': 'long(0)',            # Integer zero
-    'int': 'int(0)',              # Integer zero
-    'real': 'real(0.0)',          # Real zero
-    'double': 'double(0.0)',      # Float zero
-    'boolean': 'false',           # Boolean false
-    'datetime': 'datetime(null)', # Null datetime
-    'timespan': 'timespan(0)',    # Zero timespan
-    'dynamic': 'dynamic(null)'      # Empty dynamic object
+RESERVED_PARAMETERS = {
+    '_startTime': ('_startTimeInitialized', "let _startTimeInitialized = coalesce(_startTime, startofday(ago(7d)));"),
+    '_endTime': ('_endTimeInitialized', "let _endTimeInitialized = coalesce(_endTime, endofday(now()));"),
 }
-
-def get_default_value(param_type, selection_type) -> str:
-    if selection_type != 'scalar':
-        return "dynamic(null)" # return dynamic(null) for any list
-    if param_type == "time_range":
-        return ""
-    return KUSTO_DEFAULT_VALUES.get(param_type, 'dynamic(null)')
 
 def parameters_for_query(
     base_queries_by_name, 
     parameters_by_name,
     queries_by_id,
     query_id
-) -> list[tuple[str, str, str]]:
+) -> list[Parameter]:
     """
-    if this query were a function, what parameters would it take?
+    What parameters are needed to power this query?
+    
+    This function analyzes a query and its dependencies to determine which parameters are used.
+    It returns a list of tuples containing the parameter name, type, and selection type.
+    
+    The parameters are sorted such that '_startTime' and '_endTime' appear first, followed by other parameters.
     
     Args:
         base_queries_by_name: Dictionary mapping variable names to base queries
@@ -51,9 +119,9 @@ def parameters_for_query(
         query_id: ID of the query to analyze
         
     Returns:
-        List of tuples (parameter_name, parameter_type, selection_type) for the query, with range start and ends sorted to the beginning
+        List of tuples (parameter_name, parameter_type, selection_type)
     """
-    def get_used_parameters(
+    def get_referenced_parameters(
         base_queries_by_name, 
         queries_by_id, 
         query_id, 
@@ -100,10 +168,9 @@ def parameters_for_query(
         text = query.get('text', '')
         
         # Check for _startTime and _endTime in used variables in query text
-        if '_startTime' in text:
-            parameters.add('_startTime')
-        if '_endTime' in text:
-            parameters.add('_endTime')
+        for p in ('_startTime', '_endTime'):
+            if p in text:
+                parameters.add(p)
         
         # Process each used variable
         for var in query.get('usedVariables', []):
@@ -112,7 +179,7 @@ def parameters_for_query(
                 bq_query_id = bq.get('queryId')
                 if not bq_query_id:
                     continue
-                parameters.update(get_used_parameters(
+                parameters.update(get_referenced_parameters(
                     base_queries_by_name, 
                     queries_by_id, 
                     bq_query_id, 
@@ -130,36 +197,57 @@ def parameters_for_query(
         
         return parameters
 
-    names = get_used_parameters(base_queries_by_name, queries_by_id, query_id)
-    return [(p, 'datetime', "time_range") for p in sorted(names, reverse=True) if p in ('_startTime', '_endTime')] + \
-           [(p, parameters_by_name[p]["kind"].lower(), parameters_by_name[p]["selectionType"].lower()) for p in sorted(names) if p not in ('_startTime', '_endTime')]
+    result= []
+    names = get_referenced_parameters(base_queries_by_name, queries_by_id, query_id)
+    for p, (initialized_name, initializer) in RESERVED_PARAMETERS.items():
+        if p in names:
+            param = Parameter(p, 'datetime', "scalar", 
+                        initializer=initializer, 
+                        initialized_name=initialized_name)
+            result.append(param)
 
-def function_signature(
+    # Collect other parameters, force stable order
+    for p in sorted(names):
+        if p in RESERVED_PARAMETERS.keys():
+            continue
+        param = Parameter(p, 
+            kind=parameters_by_name[p]["kind"].lower(), 
+            selection_type=parameters_by_name[p]["selectionType"].lower(),
+            default_value=parameters_by_name[p].get("defaultValue", {}).get('value', ''),
+            )
+        result.append(param)
+    return result
+
+def function_call_signature(
     function_name: str, 
-    parameters: list[tuple[str, str, str]]
+    parameters: list[Parameter]
 ) -> str:
-    arguments = ', '.join(name for name, _, _ in parameters)
-    return f"{function_name}({arguments})"
+    return f"{function_name}({', '.join(param.name for param in parameters)})"
 
-def get_range_initializers(query_parameters):
-    range_initializers = []
-    if '_startTime' in [p for p, _, _ in query_parameters]:
-            range_initializers.append(f"let _startTime = coalesce(s, startofday(ago(7d)));")
-    if '_endTime' in [p for p, _, _ in query_parameters]:
-        range_initializers.append(f"let _endTime = coalesce(e, endofday(now()));")
-    return range_initializers
+def function_definition_parameters(
+    parameters: list[Parameter]
+) -> list[str]:
+    return [f"{p.name}:{p.kind_with_selection()}={p.default_value}"
+            for p in parameters]
 
-def get_argument_name_for_parameter(param_name: str) -> str:
-    if param_name == '_startTime':
-        return 'startTime'
-    if param_name == '_endTime':
-        return 'endTime'
-    return param_name
+def get_parameter_initializers(
+    query_parameters: list[Parameter]
+) -> list[str]:
+    return [p.initializer for p in query_parameters if p.initialized_name]
+
+def replace_initialized_parameters(
+        query_text: str, 
+        parameters: list[Parameter]
+        ) -> str:
+    for p in parameters:
+        if p.initialized_name:
+            query_text = query_text.replace(p.name, p.initialized_name)
+    return query_text
 
 def generate_kusto_function(
     function_name: str,
     query_text: str,
-    query_parameters: list[tuple[str, str, str]],
+    query_parameters: list[Parameter],
     docstring: str,
     function_folder: str
 ) -> str:
@@ -172,18 +260,17 @@ def generate_kusto_function(
     
     # build signature
     function_parameters = ""
-    range_initializers = []
+    parameter_initializers = []
     if query_parameters:
         separator = f',\n{4 * " "}'
-        params = [f"{get_argument_name_for_parameter(p)}:{p_type}={get_default_value(p_type, p_selection)}"
-                  for p, p_type, p_selection in query_parameters]
+        params = function_definition_parameters(query_parameters)
         function_parameters += separator + separator.join(params) + "\n"
-        range_initializers = get_range_initializers(query_parameters)
+        parameter_initializers = get_parameter_initializers(query_parameters)
 
     # build function body
     lines.append(f"{function_name}({function_parameters}){{")
-    if range_initializers:
-        lines.append("\n".join(range_initializers))
+    if parameter_initializers:
+        lines.append("\n".join(parameter_initializers))
     lines.append(query_text)
     lines.append(f"}}")
 
@@ -192,7 +279,7 @@ def generate_kusto_function(
 def generate_kusto_query(
     bq_name: str,
     query_text: str,
-    query_parameters: list[tuple[str, str, str]]
+    query_parameters: list[Parameter]
 ) -> str:
     # Build query with components
     query_lines = []
@@ -200,12 +287,8 @@ def generate_kusto_query(
     # Add parameter initializations if they exist
     if query_parameters:
         # Create let statements for parameters
-        parameter_initializations = [
-            f"let {p} = {get_default_value(p_type, p_selection)};"
-            for p, p_type, p_selection in query_parameters
-        ]
         query_lines.append(f"// Parameters -- begin")
-        query_lines.extend(parameter_initializations)
+        query_lines.extend([p.initializer for p in query_parameters])
         query_lines.append(f"// Parameters -- end")
         query_lines.append("//")  # Empty line for separation
         
@@ -217,7 +300,7 @@ def generate_kusto_query(
 def generate_yaml_function(
     function_name: str,
     query_text: str,
-    query_parameters: list[tuple[str, str, str]],
+    query_parameters: list[Parameter],
     docstring: str,
     function_folder: str
 ) -> str:
@@ -231,18 +314,12 @@ def generate_yaml_function(
     # Reference parameters if needed
     if query_parameters:
         # Create a comma-separated list of parameters with their default values
-        params = ','.join([f"{get_argument_name_for_parameter(p)}:{p_type}={get_default_value(p_type, p_selection)}"
-                           for p, p_type, p_selection in query_parameters])
+        params = ','.join(function_definition_parameters(query_parameters))
         yaml_lines.append(f"parameters: {params}")
     
     # Format the query body to maintain proper indentation
-    # Strip any leading/trailing whitespace and ensure consistent line endings
-    query_body = query_text.strip()
-    range_initializers = get_range_initializers(query_parameters)
-    if range_initializers:
-        query_body = '\n'.join(range_initializers) + '\n' + query_body
     yaml_lines.append("body: |-")
-    for line in query_body.split('\n'):
+    for line in get_parameter_initializers(query_parameters) + query_text.strip().split('\n'):
         yaml_lines.append(f"  {line}")
     
     return '\n'.join(yaml_lines)
@@ -267,30 +344,30 @@ def save(path, content):
             f.write('\n')  # Ensure the file ends with a newline
 
 def extract(
-        dashboard_file_path, 
-        output_folder='extracted',
-        function_folder='extracted',
-        create_yaml=False,
-        create_functions=False,
-        create_queries=False
-        ):
+    dashboard_file_path: str,
+    output_folder: str = 'extracted',
+    function_schema: str = 'extracted',
+    function_folder: str = 'extracted',
+    create_yaml: bool = False,
+    create_functions: bool = False,
+    create_queries: bool = False
+) -> None:
     """
     Extract Kusto queries from Azure Data Explorer dashboard export file.
     
     Args:
         dashboard_file_path: Path to the dashboard JSON file
         output_folder: Folder to save extracted queries in
+        function_schema: Schema to use for the functions
         function_folder: Folder name to use in the function docstring and creation command
         yaml_only: Whether to only emit YAML files (no KQL or raw queries)
     """
-    # Create output folder if it doesn't exist
-    output_path = Path(output_folder)
-    output_path.mkdir(exist_ok=True)
-    
     print(f"Loading dashboard file: {dashboard_file_path}")
     with open(dashboard_file_path, 'r') as f:
         dashboard = json.load(f)
-    
+
+    dashboard_title = dashboard.get('title', 'Unknown Dashboard')
+
     # Create lookup dictionaries for quick access
     base_queries_by_id = {}
     base_queries_by_query_id = {}
@@ -298,9 +375,7 @@ def extract(
     queries_by_id = {}
     datasources_by_id = {}
     parameters_by_name = {}
-    dashboard_title = dashboard.get('title', 'Unknown Dashboard')
     
-    # First, create lookup tables for all elements
     for base_query in dashboard.get('baseQueries', []):
         base_queries_by_id[base_query['id']] = base_query
         base_queries_by_query_id[base_query['queryId']] = base_query
@@ -317,13 +392,11 @@ def extract(
             parameters_by_name[param['variableName']] = param
         
     # Generate new names for base queries
-    snake_names = {}
-    for bq_name, bq in base_queries_by_name.items():
-        # replace prefixes 
+    output_function_names = {}
+    for bq_name, _ in base_queries_by_name.items():
         name_without_prefix = bq_name.replace('BQ', function_folder.lower())
-
-        # convert to snake_case
-        snake_names[bq_name] = camel_to_snake(name_without_prefix)
+        snake_name = camel_to_snake(name_without_prefix)
+        output_function_names[bq_name] = snake_name
 
     # Keep track of what we've processed
     processed_count = 0
@@ -334,7 +407,8 @@ def extract(
         if not query_id or query_id not in queries_by_id:
             print(f"Warning: No matching query found for base query ID {base_query_id}")
             continue
-        
+
+        # Load datasource ("schema") information
         query = queries_by_id[query_id]
         datasource_info = query.get('dataSource', {})
         datasource_id = datasource_info.get('dataSourceId')
@@ -343,53 +417,65 @@ def extract(
             print(f"Warning: No data source found for query ID {query_id}")
             continue
 
-        # Build a version of the query text where base queries are replaced with function calls
+        # In ADE dashboards, base queries are defined inline and capture parameters from their parent scope.
+        # Build a version of the query text where base queries are replaced with function calls to avoid this requirement.
         query_text = query.get('text', '')
-        query_text_with_functions = str(query_text)
-        for function_name in query.get('usedVariables', []):
-            if function_name not in base_queries_by_name:
+        query_text_modified = str(query_text)
+        for referenced_base_query_name in query.get('usedVariables', []):
+            if referenced_base_query_name not in base_queries_by_name:
                 continue
-            bq = base_queries_by_name[function_name]
-            bq_query_id = bq.get('queryId')
-            if not bq_query_id:
+            referenced_bq = base_queries_by_name[referenced_base_query_name]
+            referenced_bq_query_id = referenced_bq.get('queryId')
+            if not referenced_bq_query_id:
                 continue
 
             # Replace variable with function call using snake_case name
-            snake_case_func_name = snake_names.get(function_name, function_name)
-            sig = function_signature(snake_case_func_name, parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id))
-            query_text_with_functions = query_text_with_functions.replace(function_name, sig)
+            sig = function_call_signature(
+                function_name=output_function_names.get(referenced_base_query_name, referenced_base_query_name), 
+                parameters=parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, referenced_bq_query_id)
+                )
+            fully_qualified_name = f"database('{function_schema}').{sig}"
+            query_text_modified = query_text_modified.replace(referenced_base_query_name, fully_qualified_name)
 
-        # Get query name from variable name
-        bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
-        # Use the snake_case name if available
-        function_name = snake_names.get(bq_name, bq_name)
-        timestamp = datetime.now().strftime('%Y-%m-%d')  # Only to the hour
-        docstring=f"{bq_name} exported from dashboard {dashboard_title} on {timestamp}"
+        # Deal with parameters
         query_parameters = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, query_id)
+        query_text_modified = replace_initialized_parameters(query_text_modified, query_parameters)
 
-        # generate the output contents
+        # Generate docstring and function name
+        bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
+        function_name = output_function_names.get(bq_name, bq_name)
+        docstring=f"{bq_name} exported from dashboard {dashboard_title} on {datetime.now().strftime('%Y-%m-%d')}"
+
+        # Generate the output contents
+        # Create output folder if it doesn't exist
+        output_path = Path(output_folder)
+        if create_functions or create_yaml or create_queries:
+            output_path.mkdir(exist_ok=True)
+
         if create_functions:
             final_text = generate_kusto_function(
                 function_name=function_name,
-                query_text=query_text_with_functions,
+                query_text=query_text_modified,
                 query_parameters=query_parameters,
                 docstring=docstring,
                 function_folder=function_folder
             )
             save(output_path / f"create_{function_name}.kql", final_text)
+
         if create_yaml:
             final_text = generate_yaml_function(
                 function_name=function_name,
-                query_text=query_text_with_functions,
+                query_text=query_text_modified,
                 query_parameters=query_parameters,
                 docstring=docstring,
                 function_folder=function_folder
             )
             save(output_path / f"{function_name}.yml", final_text)
+
         if create_queries:
             final_text = generate_kusto_query(
                 bq_name=function_name,
-                query_text=query_text,
+                query_text=query_text, # do not use modified version
                 query_parameters=query_parameters
             )
             save(output_path / f"{function_name}.kusto", final_text)
@@ -402,6 +488,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract Kusto queries from Azure Data Explorer dashboard export")
     parser.add_argument("dashboard_file", help="Path to the dashboard JSON file")
     parser.add_argument("--output", "-o", default="extracted", help="Where to save output files")
+    parser.add_argument("--function_schema", "-fs", default="extracted", help="Which schema will contain these functions?")
     parser.add_argument("--function_folder", "-ff", default="extracted", help="Where to create functions in the kusto database's /functions dir")
     parser.add_argument("--yaml", action="store_true", help="Emit YAML files")
     parser.add_argument("--functions", action="store_true", help="Emit create-or-alter function definition files")
@@ -411,6 +498,7 @@ if __name__ == '__main__':
     extract(
         args.dashboard_file, 
         args.output,
+        args.function_schema,
         args.function_folder,
         create_yaml=args.yaml,
         create_functions=args.functions,
