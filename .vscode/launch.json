@@ -18,6 +18,20 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
+                "/mnt/c/Users/zacox/Downloads/cp-ops.json", 
+                "--output", "/mnt/c/Users/zacox/Downloads/kusto_output", 
+                "-ff", "health"
+            ]
+        },
+        {
+            "name": "py: test parser",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": [
+                "/home/zacox/code/warehouse-config/kusto/ghdwprod/dw/functions/", 
+                "/home/zacox/code/warehouse-config/kusto/ghdwprod/shared/functions/"
             ]
         },
         {

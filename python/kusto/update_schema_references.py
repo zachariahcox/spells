@@ -24,7 +24,10 @@ def find_prefix(s: str, prefix: str) -> bool:
             return True
     return False
 
-def main(data_folder: str, yml_folder: str) -> int:
+def main(
+        data_folder: str, 
+        yml_folder: str
+        ) -> int:
     """Main entry point for the CLI."""
     assert(os.path.isdir(data_folder)), f"Data folder '{data_folder}' does not exist or is not a directory."
     assert(os.path.isdir(yml_folder)), f"YML folder '{yml_folder}' does not exist or is not a directory."
