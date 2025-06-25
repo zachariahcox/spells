@@ -13,7 +13,7 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(levelname)s: %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.disabled = True  # Disabled by default
+handler.setLevel(logging.ERROR)
 
 def enable_logging(enabled=True, debug=False):
     """Enable or disable logging output
@@ -22,14 +22,18 @@ def enable_logging(enabled=True, debug=False):
         enabled: Whether to enable logging
         debug: Whether to show debug level messages
     """
-    logger.disabled = not enabled
-    if enabled:
-        if debug:
-            handler.setLevel(logging.DEBUG)
-            logger.debug("Debug logging enabled")
-        else:
-            handler.setLevel(logging.INFO)
-            logger.debug("Logging enabled")
+    if not enabled:
+        # When disabled, only show ERROR level
+        handler.setLevel(logging.ERROR)
+        return
+        
+    # When enabled, set appropriate level
+    if debug:
+        handler.setLevel(logging.DEBUG)
+        logger.debug("Debug logging enabled")
+    else:
+        handler.setLevel(logging.INFO)
+        logger.debug("Logging enabled")
 
 def get_issues(project_url, field_values=None):
     """Search for GitHub issues using a query string and filter to only issues in the specified project.
@@ -46,9 +50,12 @@ def get_issues(project_url, field_values=None):
         or call enable_logging(True) when using this function programmatically.
     """
     # First check if a project URL is provided
-    assert project_url is not None, "Project URL must be provided to filter issues by project"
-
-    try:
+    if not project_url:
+        # When no project URL is provided, raise an error
+        logger.error("Project URL must be provided to filter issues by project")
+        raise ValueError("Project URL must be provided to filter issues by project")
+    
+    try:    
         # Extract project owner, repo, and number from the URL
         # Format could be:
         # - https://github.com/orgs/{org}/projects/{number}
@@ -446,11 +453,32 @@ def get_issues(project_url, field_values=None):
         return []
     
 
+def check_gh_auth_scopes():
+    """Check if GitHub CLI is installed and has the necessary project scope"""
+    # Check if gh CLI is installed
+    if not shutil.which("gh"):
+        raise RuntimeError("GitHub CLI (gh) not found. Please install it: https://cli.github.com/")
+    
+    # Check if user has the required project scope
+    try:
+        # First run gh auth status and grep for scopes to get just the scope information
+        result = subprocess.run(
+            ["sh", "-c", "gh auth status | grep scopes"], 
+            capture_output=True, 
+            text=True
+        )
+        
+        if "project" not in result.stdout.lower():
+            logger.warning("GitHub CLI doesn't have project scope authorization.")
+            logger.warning("Run 'gh auth refresh -s project' to add the required scope.")
+            sys.exit(1)
+    except subprocess.SubprocessError:
+        logger.warning("Failed to check GitHub authorization scopes.")
+
 if __name__ == "__main__":
     try:
-        # Check if gh CLI is installed
-        if not shutil.which("gh"):
-            raise RuntimeError("GitHub CLI (gh) not found. Please install it: https://cli.github.com/")
+        # Check GitHub CLI installation and authorization
+        check_gh_auth_scopes()
 
         # Set up argument parser
         parser = argparse.ArgumentParser(description="Get GitHub issues from a project with filtering options")
