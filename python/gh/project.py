@@ -1,3 +1,11 @@
+"""
+The script produces lists of GitHub issues referenced by GitHub projects.
+The projects API has key limitations on query lengths.
+Many operations require multiple queries and offline processing.
+
+Usage:
+    python project.py <project_url> [--field NAME VALUE] [--output FORMAT] [--verbose] [--quiet]
+"""
 import subprocess
 import json
 import re
@@ -14,26 +22,6 @@ formatter = logging.Formatter('%(levelname)s: %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 handler.setLevel(logging.ERROR)
-
-def enable_logging(enabled=True, debug=False):
-    """Enable or disable logging output
-    
-    Args:
-        enabled: Whether to enable logging
-        debug: Whether to show debug level messages
-    """
-    if not enabled:
-        # When disabled, only show ERROR level
-        handler.setLevel(logging.ERROR)
-        return
-        
-    # When enabled, set appropriate level
-    if debug:
-        handler.setLevel(logging.DEBUG)
-        logger.debug("Debug logging enabled")
-    else:
-        handler.setLevel(logging.INFO)
-        logger.debug("Logging enabled")
 
 def get_issues(project_url, field_values=None):
     """Search for GitHub issues using a query string and filter to only issues in the specified project.
@@ -486,15 +474,19 @@ if __name__ == "__main__":
         parser.add_argument("--field", "-f", action="append", nargs=2, metavar=("NAME", "VALUE"), 
                            help="Project field filter in format 'field_name field_value'. Can be used multiple times.")
         parser.add_argument("--output", "-o", help="Output format: 'urls' (default), 'markdown', or 'json'")
-        parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging output")
-        parser.add_argument("--debug", "-d", action="store_true", help="Enable debug level logging (implies --verbose)")
+        parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+        parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
         
         args = parser.parse_args()
         
-        # Configure logging based on verbose/debug flags
-        if args.verbose or args.debug:
-            enable_logging(True, debug=args.debug)
-        
+        # Configure logging based on command line options
+        if args.verbose:
+            logger.setLevel(logging.DEBUG)
+        elif args.quiet:
+            logger.setLevel(logging.ERROR)
+        else:
+            logger.setLevel(logging.WARNING)
+
         # Convert field arguments to a dictionary
         field_values = {}
         if args.field:
