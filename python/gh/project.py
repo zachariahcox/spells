@@ -24,6 +24,103 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 handler.setLevel(logging.DEBUG)
 
+def create_project_query_template(
+    entity_type: str, 
+    entity_identifier: str, 
+    project_number: str
+) -> str:
+    """
+    Create a GraphQL query template for a GitHub project.
+    
+    Args:
+        entity_type: The type of entity (organization, user, or repository)
+        entity_identifier: The identifier(s) for the entity - org name, user login, or owner/repo pair
+        project_number: The project number
+        
+    Returns:
+        A formatted GraphQL query string
+    """
+    # For repository type, we need to split the identifier into owner and repo
+    entity_params = ""
+    if entity_type == "repository":
+        owner, repo = entity_identifier.split('/')
+        entity_params = f'(owner: "{owner}", name: "{repo}")'
+    elif entity_type == "organization" or entity_type == "user":
+        entity_params = f'(login: "{entity_identifier}")'
+    
+    # Build the GraphQL query using the appropriate entity type
+    return f"""
+    query {{
+        {entity_type}{entity_params} {{
+        projectV2(number: {project_number}) {{
+            fields(first: 20) {{
+                nodes {{
+                    ... on ProjectV2Field {{
+                        id
+                        name
+                    }}
+                    ... on ProjectV2IterationField {{
+                        id
+                        name
+                    }}
+                    ... on ProjectV2SingleSelectField {{
+                        id
+                        name
+                        options {{
+                            id
+                            name
+                        }}
+                    }}
+                }}
+            }}
+            items(first: 100) {{
+            pageInfo {{
+                hasNextPage
+                endCursor
+            }}
+            nodes {{
+                id
+                fieldValues(first: 20) {{
+                    nodes {{
+                        ... on ProjectV2ItemFieldTextValue {{
+                            text
+                            field {{ ... on ProjectV2Field {{ name id }} }}
+                        }}
+                        ... on ProjectV2ItemFieldDateValue {{
+                            date
+                            field {{ ... on ProjectV2Field {{ name id }} }}
+                        }}
+                        ... on ProjectV2ItemFieldSingleSelectValue {{
+                            name
+                            field {{ ... on ProjectV2SingleSelectField {{ name id }} }}
+                        }}
+                        ... on ProjectV2ItemFieldNumberValue {{
+                            number
+                            field {{ ... on ProjectV2Field {{ name id }} }}
+                        }}
+                    }}
+                }}
+                content {{
+                ... on Issue {{
+                    url
+                    title
+                    state
+                    labels(first: 10) {{
+                      nodes {{
+                        name
+                        color
+                      }}
+                    }}
+                    __typename
+                }}
+                }}
+            }}
+            }}
+        }}
+        }}
+    }}
+    """
+
 def get_issues(
     project_url: str, 
     field_values: dict[str, str] | None = None
@@ -63,154 +160,14 @@ def get_issues(
             logger.debug(f"Fetching issues from organization project: {org}/projects/{project_number}")
             
             # GraphQL query for organization project
-            graphql_query = f"""
-            query {{
-                organization(login: "{org}") {{
-                projectV2(number: {project_number}) {{
-                    fields(first: 20) {{
-                        nodes {{
-                            ... on ProjectV2Field {{
-                                id
-                                name
-                            }}
-                            ... on ProjectV2IterationField {{
-                                id
-                                name
-                            }}
-                            ... on ProjectV2SingleSelectField {{
-                                id
-                                name
-                                options {{
-                                    id
-                                    name
-                                }}
-                            }}
-                        }}
-                    }}
-                    items(first: 100) {{
-                    pageInfo {{
-                        hasNextPage
-                        endCursor
-                    }}
-                    nodes {{
-                        id
-                        fieldValues(first: 20) {{
-                            nodes {{
-                                ... on ProjectV2ItemFieldTextValue {{
-                                    text
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldDateValue {{
-                                    date
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldSingleSelectValue {{
-                                    name
-                                    field {{ ... on ProjectV2SingleSelectField {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldNumberValue {{
-                                    number
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                            }}
-                        }}
-                        content {{
-                        ... on Issue {{
-                            url
-                            title
-                            state
-                            labels(first: 10) {{
-                              nodes {{
-                                name
-                                color
-                              }}
-                            }}
-                            __typename
-                        }}
-                        }}
-                    }}
-                    }}
-                }}
-                }}
-            }}
-            """
+            graphql_query = create_project_query_template("organization", org, project_number)
         elif user_match:
             user = user_match.group(1)
             project_number = user_match.group(2)
             logger.debug(f"Fetching issues from user project: {user}/projects/{project_number}")
             
             # GraphQL query for user project
-            graphql_query = f"""
-            query {{
-                user(login: "{user}") {{
-                projectV2(number: {project_number}) {{
-                    fields(first: 20) {{
-                        nodes {{
-                            ... on ProjectV2Field {{
-                                id
-                                name
-                            }}
-                            ... on ProjectV2IterationField {{
-                                id
-                                name
-                            }}
-                            ... on ProjectV2SingleSelectField {{
-                                id
-                                name
-                                options {{
-                                    id
-                                    name
-                                }}
-                            }}
-                        }}
-                    }}
-                    items(first: 100) {{
-                    pageInfo {{
-                        hasNextPage
-                        endCursor
-                    }}
-                    nodes {{
-                        id
-                        fieldValues(first: 20) {{
-                            nodes {{
-                                ... on ProjectV2ItemFieldTextValue {{
-                                    text
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldDateValue {{
-                                    date
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldSingleSelectValue {{
-                                    name
-                                    field {{ ... on ProjectV2SingleSelectField {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldNumberValue {{
-                                    number
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                            }}
-                        }}
-                        content {{
-                        ... on Issue {{
-                            url
-                            title
-                            state
-                            labels(first: 10) {{
-                              nodes {{
-                                name
-                                color
-                              }}
-                            }}
-                            __typename
-                        }}
-                        }}
-                    }}
-                    }}
-                }}
-                }}
-            }}
-            """
+            graphql_query = create_project_query_template("user", user, project_number)
         elif repo_match:
             owner = repo_match.group(1)
             repo = repo_match.group(2)
@@ -218,77 +175,7 @@ def get_issues(
             logger.debug(f"Fetching issues from repository project: {owner}/{repo}/projects/{project_number}")
             
             # GraphQL query for repository project
-            graphql_query = f"""
-            query {{
-                repository(owner: "{owner}", name: "{repo}") {{
-                projectV2(number: {project_number}) {{
-                    fields(first: 20) {{
-                        nodes {{
-                            ... on ProjectV2Field {{
-                                id
-                                name
-                            }}
-                            ... on ProjectV2IterationField {{
-                                id
-                                name
-                            }}
-                            ... on ProjectV2SingleSelectField {{
-                                id
-                                name
-                                options {{
-                                    id
-                                    name
-                                }}
-                            }}
-                        }}
-                    }}
-                    items(first: 100) {{
-                    pageInfo {{
-                        hasNextPage
-                        endCursor
-                    }}
-                    nodes {{
-                        id
-                        fieldValues(first: 20) {{
-                            nodes {{
-                                ... on ProjectV2ItemFieldTextValue {{
-                                    text
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldDateValue {{
-                                    date
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldSingleSelectValue {{
-                                    name
-                                    field {{ ... on ProjectV2SingleSelectField {{ name id }} }}
-                                }}
-                                ... on ProjectV2ItemFieldNumberValue {{
-                                    number
-                                    field {{ ... on ProjectV2Field {{ name id }} }}
-                                }}
-                            }}
-                        }}
-                        content {{
-                        ... on Issue {{
-                            url
-                            title
-                            state
-                            labels(first: 10) {{
-                              nodes {{
-                                name
-                                color
-                              }}
-                            }}
-                            __typename
-                        }}
-                        }}
-                    }}
-                    }}
-                }}
-                }}
-            }}
-            """
+            graphql_query = create_project_query_template("repository", f"{owner}/{repo}", project_number)
         else:
             logger.error(f"Unrecognized project URL format: {project_url}")
             return []
@@ -298,15 +185,14 @@ def get_issues(
         has_next_page = True
         end_cursor = None
 
-        # Navigate the response structure based on the project type
+        # Determine the node name for navigating the response structure
+        node_name = "unknown"
         if org_match:
             node_name = "organization"
         elif user_match:
             node_name = "user"
         elif repo_match:
             node_name = "repository"
-        else:
-            node_name = "unknown"
         
         while has_next_page:
             # Add pagination parameters
