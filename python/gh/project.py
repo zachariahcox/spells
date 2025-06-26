@@ -3,6 +3,7 @@ The script produces lists of GitHub issues referenced by GitHub projects.
 The projects API has key limitations on query lengths.
 Many operations require multiple queries and offline processing.
 
+You'll need to have the GitHub CLI installed and authenticated with the `project` scope.
 Usage:
     python project.py <project_url> [--field NAME VALUE] [--output FORMAT] [--verbose] [--quiet]
 """
@@ -16,14 +17,17 @@ import logging
 
 # Setup logger
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)  # Allow all levels, control by handler level
 handler = logging.StreamHandler()
 formatter = logging.Formatter('%(levelname)s: %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-handler.setLevel(logging.ERROR)
+logger.setLevel(logging.DEBUG)
+handler.setLevel(logging.DEBUG)
 
-def get_issues(project_url, field_values=None):
+def get_issues(
+    project_url: str, 
+    field_values: dict[str, str] | None = None
+) -> list[str]:
     """Search for GitHub issues using a query string and filter to only issues in the specified project.
     
     Args:
@@ -32,10 +36,6 @@ def get_issues(project_url, field_values=None):
         
     Returns:
         List of GitHub issue URLs belonging to the specified project
-        
-    Note:
-        Logging is disabled by default. Use the --verbose flag when running this script
-        or call enable_logging(True) when using this function programmatically.
     """
     # First check if a project URL is provided
     if not project_url:
@@ -441,7 +441,7 @@ def get_issues(project_url, field_values=None):
         return []
     
 
-def check_gh_auth_scopes():
+def check_gh_auth_scopes() -> None:
     """Check if GitHub CLI is installed and has the necessary project scope"""
     # Check if gh CLI is installed
     if not shutil.which("gh"):
@@ -482,10 +482,13 @@ if __name__ == "__main__":
         # Configure logging based on command line options
         if args.verbose:
             logger.setLevel(logging.DEBUG)
+            handler.setLevel(logging.DEBUG)
         elif args.quiet:
             logger.setLevel(logging.ERROR)
+            handler.setLevel(logging.ERROR)
         else:
             logger.setLevel(logging.WARNING)
+            handler.setLevel(logging.WARNING)
 
         # Convert field arguments to a dictionary
         field_values = {}
