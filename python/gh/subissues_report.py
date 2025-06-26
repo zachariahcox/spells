@@ -1,4 +1,39 @@
-# This script uses the GitHub CLI to fetch sub-issues of a given list of issues.
+"""
+This script uses the GitHub CLI to fetch sub-issues of a given list of issues.
+It extracts relevant information such as status, target date, and last update,
+and generates a markdown report.
+
+It supports:
+- Fetching sub-issues using the GitHub Sub-issues
+    API via the `gh` CLI.
+- Extracting target dates from issue comments.
+- Formatting the report with markdown links and emojis for status.
+- Filtering issues based on last update date.
+- Generating a combined report or individual reports for each issue.
+
+Usage:
+    python subissues_report.py [options] <issue_urls>
+    
+Options:
+    --include-parent, -p      
+        Include parent issue column in the report
+    --since <date>, -s <date>  
+        Only include issues updated on or after this date (YYYY-MM-DD)
+    --output-file <file>, -o <file>  
+        Write the markdown report to this file instead of standard output
+    --individual, -i
+        Generate a separate report for each provided issue
+    --stdin, -s
+        Read issue URLs from standard input (one per line)
+    --verbose, -v
+        Enable verbose output
+    --quiet, -q
+        Suppress all non-essential output
+
+Example:
+    python subissues_report.py --include-parent --since 2023-01-01  --output-file report.md
+    python subissues_report.py --stdin < issues.txt --include-parent
+"""
 import json
 import os
 import re
@@ -502,16 +537,13 @@ if __name__ == "__main__":
         parser.add_argument("--individual", "-i", action="store_true", help="Generate a separate report for each provided issue")
         parser.add_argument("--stdin", "-s", action="store_true", help="Read issue URLs from standard input (one per line)")
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
-        parser.add_argument("--debug", "-d", action="store_true", help="Enable debug output (implies verbose)")
         parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
         
         args = parser.parse_args()
         
         # Configure logging based on command line options
-        if args.debug:
+        if args.verbose:
             logger.setLevel(logging.DEBUG)
-        elif args.verbose:
-            logger.setLevel(logging.INFO)
         elif args.quiet:
             logger.setLevel(logging.ERROR)
         else:
