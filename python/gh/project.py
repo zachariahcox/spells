@@ -140,6 +140,8 @@ def get_issues(
         logger.error("Project URL must be provided to filter issues by project")
         raise ValueError("Project URL must be provided to filter issues by project")
     
+    check_gh_auth_scopes()
+
     try:    
         # Extract project owner, repo, and number from the URL
         # Format could be:
@@ -351,15 +353,12 @@ def check_gh_auth_scopes() -> None:
 
 if __name__ == "__main__":
     try:
-        # Check GitHub CLI installation and authorization
-        check_gh_auth_scopes()
-
         # Set up argument parser
         parser = argparse.ArgumentParser(description="Get GitHub issues from a project with filtering options")
         parser.add_argument("project_url", help="GitHub project URL (org, user, or repo project)")
         parser.add_argument("--field", "-f", action="append", nargs=2, metavar=("NAME", "VALUE"), 
                            help="Project field filter in format 'field_name field_value'. Can be used multiple times.")
-        parser.add_argument("--output", "-o", help="Output format: 'urls' (default), 'markdown', or 'json'")
+        parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'markdown', or 'json'")
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
         parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
         

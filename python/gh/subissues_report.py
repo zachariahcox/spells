@@ -534,7 +534,7 @@ if __name__ == "__main__":
         parser.add_argument("--include-parent", action="store_true", help="Include parent column in the report")
         parser.add_argument("--since", type=str, help="Only include issues updated on or after this date (YYYY-MM-DD)")
         parser.add_argument("--output-file", "-o", type=str, help="Write the markdown report to this file instead of standard output")
-        parser.add_argument("--individual", "-i", action="store_true", help="Generate a separate report for each provided issue")
+        parser.add_argument("--individual", "-i", action="store_true", help="Generate a separate report for each parent issue")
         parser.add_argument("--stdin", "-s", action="store_true", help="Read issue URLs from standard input (one per line)")
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
         parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
