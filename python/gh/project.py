@@ -5,7 +5,7 @@ Many operations require multiple queries and offline processing.
 
 You'll need to have the GitHub CLI installed and authenticated with the `project` scope.
 Usage:
-    python project.py <project_url> [--field NAME VALUE] [--output FORMAT] [--verbose] [--quiet]
+    python project.py <project_url> [--field NAME VALUE] [--output FORMAT] [--verbose] [--quiet] [--subissues] [--title]
 """
 import subprocess
 import json
@@ -455,9 +455,8 @@ if __name__ == "__main__":
                            help="Items where custom field _is_ specified value in format: 'field_name field_value'. Can be used multiple times.")
         parser.add_argument("--fieldIsNot", "-n", action="append", nargs=2, metavar=("NAME", "VALUE"), 
                            help="Items where custom field is _not_ specified value in format: 'field_name field_value'. Can be used multiple times.")
-        parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'markdown', or 'json'")
+        parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'csv', 'markdown', or 'json'")
         parser.add_argument("--subissues", "-s", action="store_true", help="Include sub-issues in the output")
-        parser.add_argument("--title", action="store_true", help="include titles in the output")
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
         parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
         
@@ -496,7 +495,7 @@ if __name__ == "__main__":
         subissues = []
         if args.subissues and issue_details:
             for i in issue_details:
-                subissues.extend(get_sub_issues(i['url']))
+                subissues.extend(get_sub_issues(i.get('url'), parent_title=i.get('title')))
                 logger.debug(f"Sub-issues for {i['url']}: {subissues}")
     
         if args.output == "json":
@@ -506,20 +505,23 @@ if __name__ == "__main__":
             print("\n### Issues\n")
             for i in issue_details:
                 print(f"- [{i['url']}]({i['url']})")
-        else:
-            # Default output format is just URLs
+        elif args.output == "csv":
+            # Default output format is a list
             for issue in issue_details:
-                if args.title:
-                    print(issue.get("url", ""), issue.get("title", "No title"), sep=",")
-                else:
-                    print(issue.get("url", ""))
-            if subissues:
-                print("\n\n\n")
-                for issue in subissues:
-                    if args.title:
-                        print(issue.get("url", ""), issue.get("title", "No title"), sep=",")
-                    else:
-                        print(issue.get("url", ""))
+                print(issue.get("title", "No title"), 
+                    issue.get("url", ""), 
+                    sep=",")
+            for issue in subissues:
+                print(issue.get('parent_title', 'No parent title'),
+                    issue.get("title", "No title"), 
+                    issue.get("url", ""), 
+                    sep=",")
+        else:
+            for issue in issue_details:
+                print(issue.get("url", ""))
+            for issue in subissues:
+                print(issue.get("url", ""))
+                    
         
     except KeyboardInterrupt:
         logger.error("Operation canceled by user.")
