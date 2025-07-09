@@ -14,6 +14,7 @@ import shutil
 import sys
 import argparse
 import logging
+from typing import List, Dict, Optional, Tuple
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -23,6 +24,17 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 handler.setLevel(logging.DEBUG)
+
+def log_json(data, message=None):
+    """Helper function to log JSON data during debugging"""
+    if logger.level <= logging.DEBUG:
+        if message:
+            logger.debug(message)
+        try:
+            logger.debug(json.dumps(data, indent=2))
+        except Exception as e:
+            logger.debug(f"Could not format JSON: {e}")
+            logger.debug(str(data))
 
 def create_project_query_template(
     entity_type: str, 
@@ -123,14 +135,15 @@ def create_project_query_template(
 
 def get_issues(
     project_url: str, 
-    field_values: dict[str, str] | None = None
-) -> list[str]:
+    field_values: dict[str, str] | None = None,
+    negative_field_values: List[Tuple[str, str]] | None = None
+) -> list[Dict[str, str]]:
     """Search for GitHub issues using a query string and filter to only issues in the specified project.
     
     Args:
         project_url: The URL of the GitHub project to filter issues by. Project can contain issues from multiple repos.
         field_values: Optional dictionary of project field values to filter by {field_name: field_value}
-        
+        negative_field_values: Optional list of tuples for project field values to exclude [(field_name, field_value)]
     Returns:
         List of GitHub issue URLs belonging to the specified project
     """
@@ -240,10 +253,6 @@ def get_issues(
         
         # Use the accumulated data for further processing
         data = all_data
-        
-        # Extract issue information from the result
-        issue_urls = []
-        issue_details = []
 
         # Get project fields structure
         project_data = data.get("data", {}).get(node_name, {}).get("projectV2", {})
@@ -256,6 +265,7 @@ def get_issues(
                 field_dict[field["name"]] = field
         
         # Extract issue URLs and other details
+        issue_details = []
         items = project_data.get("items", {}).get("nodes", [])
         for item in items:
             content = item.get("content", {})
@@ -277,20 +287,22 @@ def get_issues(
                         elif "number" in fv:
                             item_field_values[field_name] = fv["number"]
             
-            # Skip this item if it doesn't match the required field values
+            # Apply the field filters 
+            should_skip = False
             if field_values:
-                match = True
                 for field_name, expected_value in field_values.items():
                     if field_name not in item_field_values or item_field_values[field_name] != expected_value:
-                        match = False
+                        should_skip = True
                         break
-                
-                if not match:
-                    continue
+            if negative_field_values:
+                for field_name, excluded_value in negative_field_values:
+                    if field_name in item_field_values and item_field_values[field_name] == excluded_value:
+                        should_skip = True
+                        break
+            if should_skip:
+                continue
                     
-            if content and "url" in content and content.get("__typename") == "Issue":
-                issue_urls.append(content["url"])
-                
+            if content:
                 # Extract label information
                 labels = []
                 if "labels" in content and "nodes" in content["labels"]:
@@ -305,18 +317,18 @@ def get_issues(
                 issue_details.append({
                     "url": content["url"],
                     "title": content.get("title", "No title"),
-                    "state": content.get("state", "OPEN"),
+                    "state": content.get("state", "No state"),
                     "labels": labels,
-                    "type": content.get("__typename", "Issue"),
+                    "type": content.get("__typename", "No type"),
                     "field_values": item_field_values
                 })
         
         # Field values filtering already happened during extraction
         if field_values:
-            logger.info(f"Found {len(items)} items in project, filtered to {len(issue_urls)} issues matching the field value criteria")
-        
-        return issue_urls
-    
+            logger.info(f"Found {len(items)} items in project, filtered to {len(issue_details)} issues matching the field value criteria")
+
+        return issue_details
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Error accessing project {project_url}. Make sure the project exists and you have access.")
         logger.error("Add project scope like this: gh auth refresh -s project")
@@ -328,6 +340,89 @@ def get_issues(
         logger.error(f"Error parsing project data: {e}")
         return []
     
+def get_sub_issues(
+        parent_issue_url: str,
+        parent_title: Optional[str] = None
+        ) -> List[Dict]:
+    """Get sub-issues using the GitHub Sub-issues API via gh CLI.
+    
+    Args:
+        issue_url: The URL of the issue to fetch sub-issues for
+    """
+    check_gh_auth_scopes()
+
+    # Check if the parent issue URL is provided
+    if not parent_issue_url:
+        logger.error("Parent issue URL must be provided to fetch sub-issues")
+        raise ValueError("Parent issue URL must be provided to fetch sub-issues")
+
+    # Use gh api to call the sub-issues endpoint with correct headers
+    try:
+        # Extract owner, repository, and issue number from the URL
+        match = re.match(r'https://github\.com/([^/]+)/([^/]+)/issues/(\d+)', parent_issue_url)
+        if not match:
+            logger.error(f"Invalid issue URL format: {parent_issue_url}")
+            return []
+        
+        owner, repository, issue_number = match.groups()
+        repo = f"{owner}/{repository}"
+        api_endpoint = f"/repos/{owner}/{repository}/issues/{issue_number}/sub_issues"
+        
+        # Use gh api command with the correct headers as specified in the GitHub API docs
+        cmd = [
+            "gh", "api",
+            "-H", "Accept: application/vnd.github+json",
+            "-H", "X-GitHub-Api-Version: 2022-11-28",
+            api_endpoint
+        ]
+        
+        logger.debug(f"Running command: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        logger.debug(f"Command completed with exit code: {result.returncode}")
+        sub_issues_data = json.loads(result.stdout)
+        log_json(sub_issues_data, f"Sub-issues data for {repo}#{issue_number}:")
+        
+        # For each sub-issue, fetch full details to get labels
+        sub_issues = []
+        for sub_issue in sub_issues_data:
+            # Extract repository and issue number from the API response
+            sub_repo = sub_issue.get("repository", {}).get("full_name", "")
+            if not sub_repo and "repository_url" in sub_issue:
+                # Fallback to repository_url if available
+                sub_repo = sub_issue.get("repository_url", "").replace("https://api.github.com/repos/", "")
+            
+            sub_issue_number = str(sub_issue.get("number", ""))
+            
+            # Only proceed if we have valid information
+            if sub_repo and sub_issue_number:
+                logger.info(f"  - Found: https://github.com/{sub_repo}/issues/{sub_issue_number}")
+                cmd = ["gh", "issue", "view", sub_issue_number, "--repo", sub_repo, "--json", "url,title,labels,number,state,closedAt"]
+                logger.debug(f"Running command: {' '.join(cmd)}")
+                sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                logger.debug(f"Command completed with exit code: {sub_result.returncode}")
+                detailed_sub_issue = json.loads(sub_result.stdout)
+                log_json(detailed_sub_issue, f"Detailed sub-issue data for {sub_repo}#{sub_issue_number}:")
+
+                # target_date, comment_timestamp, comment_url = get_target_date_from_comments(sub_repo, sub_issue_number)
+                # detailed_sub_issue["target_date"] = target_date if target_date else "N/A"
+                # detailed_sub_issue["last_updated_at"] = comment_timestamp if comment_timestamp else "N/A"
+                # detailed_sub_issue["comment_url"] = comment_url if comment_url else "N/A"
+                
+                # Add parent issue information
+                detailed_sub_issue["parent_url"] = parent_issue_url
+                detailed_sub_issue["parent_title"] = parent_title if parent_title else f"{repo}#{issue_number}"
+                
+                sub_issues.append(detailed_sub_issue)
+            else:
+                logger.warning(f"  - Incomplete sub-issue data: {sub_issue}")
+        
+        return sub_issues
+        
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Error getting sub-issues for {repo}#{issue_number}: {e}")
+        if hasattr(e, 'stderr'):
+            logger.error(f"stderr: {e.stderr}")
+        return []
 
 def check_gh_auth_scopes() -> None:
     """Check if GitHub CLI is installed and has the necessary project scope"""
@@ -357,8 +452,12 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Get GitHub issues from a project with filtering options")
         parser.add_argument("project_url", help="GitHub project URL (org, user, or repo project)")
         parser.add_argument("--field", "-f", action="append", nargs=2, metavar=("NAME", "VALUE"), 
-                           help="Project field filter in format 'field_name field_value'. Can be used multiple times.")
+                           help="Items where custom field _is_ specified value in format: 'field_name field_value'. Can be used multiple times.")
+        parser.add_argument("--fieldIsNot", "-n", action="append", nargs=2, metavar=("NAME", "VALUE"), 
+                           help="Items where custom field is _not_ specified value in format: 'field_name field_value'. Can be used multiple times.")
         parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'markdown', or 'json'")
+        parser.add_argument("--subissues", "-s", action="store_true", help="Include sub-issues in the output")
+        parser.add_argument("--title", action="store_true", help="include titles in the output")
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
         parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
         
@@ -381,26 +480,47 @@ if __name__ == "__main__":
             for field_name, field_value in args.field:
                 field_values[field_name] = field_value
         
+        # Convert negative field arguments to a list of tuples
+        negative_field_values = []
+        if args.fieldIsNot:
+            for field_name, field_value in args.fieldIsNot:
+                negative_field_values.append((field_name, field_value))
+
         # Get issues with the specified filters
-        issue_urls = get_issues(args.project_url, field_values)
-        
-        # Output based on format
-        if not issue_urls:
+        issue_details = get_issues(args.project_url, field_values, negative_field_values)
+        if not issue_details:
             print("No matching issues found.")
             sys.exit(0)
-            
+
+        # Get subissues if requested
+        subissues = []
+        if args.subissues and issue_details:
+            for i in issue_details:
+                subissues.extend(get_sub_issues(i['url']))
+                logger.debug(f"Sub-issues for {i['url']}: {subissues}")
+    
         if args.output == "json":
             import json
-            print(json.dumps(issue_urls))
+            print(json.dumps(issue_details, indent=2))
         elif args.output == "markdown":
             print("\n### Issues\n")
-            for url in issue_urls:
-                print(f"- [{url}]({url})")
+            for i in issue_details:
+                print(f"- [{i['url']}]({i['url']})")
         else:
             # Default output format is just URLs
-            for url in issue_urls:
-                print(url)
-    
+            for issue in issue_details:
+                if args.title:
+                    print(issue.get("url", ""), issue.get("title", "No title"))
+                else:
+                    print(issue.get("url", ""))
+            if subissues:
+                print("\n\n\n")
+                for issue in subissues:
+                    if args.title:
+                        print(issue.get("url", ""), issue.get("title", "No title"))
+                    else:
+                        print(issue.get("url", ""))
+        
     except KeyboardInterrupt:
         logger.error("Operation canceled by user.")
         sys.exit(1)
