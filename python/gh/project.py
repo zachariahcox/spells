@@ -510,14 +510,14 @@ if __name__ == "__main__":
             # Default output format is just URLs
             for issue in issue_details:
                 if args.title:
-                    print(issue.get("url", ""), issue.get("title", "No title"), sep="\t")
+                    print(issue.get("url", ""), issue.get("title", "No title"), sep=",")
                 else:
                     print(issue.get("url", ""))
             if subissues:
                 print("\n\n\n")
                 for issue in subissues:
                     if args.title:
-                        print(issue.get("url", ""), issue.get("title", "No title"), sep="\t")
+                        print(issue.get("url", ""), issue.get("title", "No title"), sep=",")
                     else:
                         print(issue.get("url", ""))
         
