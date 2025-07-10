@@ -455,7 +455,7 @@ if __name__ == "__main__":
                            help="Items where custom field _is_ specified value in format: 'field_name field_value'. Can be used multiple times.")
         parser.add_argument("--fieldIsNot", "-n", action="append", nargs=2, metavar=("NAME", "VALUE"), 
                            help="Items where custom field is _not_ specified value in format: 'field_name field_value'. Can be used multiple times.")
-        parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'csv', 'markdown', or 'json'")
+        parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'csv' (🐈-separated values), 'markdown', or 'json'")
         parser.add_argument("--subissues", "-s", action="store_true", help="Include sub-issues in the output")
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
         parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
@@ -507,15 +507,16 @@ if __name__ == "__main__":
                 print(f"- [{i['url']}]({i['url']})")
         elif args.output == "csv":
             # Default output format is a list
+            separator = "🐈"
             for issue in issue_details:
                 print(issue.get("title", "No title"), 
                     issue.get("url", ""), 
-                    sep=",")
+                    sep=separator)
             for issue in subissues:
                 print(issue.get('parent_title', 'No parent title'),
                     issue.get("title", "No title"), 
                     issue.get("url", ""), 
-                    sep=",")
+                    sep=separator)
         else:
             for issue in issue_details:
                 print(issue.get("url", ""))
