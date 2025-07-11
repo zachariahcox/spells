@@ -492,12 +492,12 @@ if __name__ == "__main__":
             sys.exit(0)
 
         # Get subissues if requested
-        subissues = []
+        subissue_details = []
         if args.subissues and issue_details:
             for i in issue_details:
-                subissues.extend(get_sub_issues(i.get('url'), parent_title=i.get('title')))
-                logger.debug(f"Sub-issues for {i['url']}: {subissues}")
-    
+                subissue_details.extend(get_sub_issues(i.get('url'), parent_title=i.get('title')))
+                logger.debug(f"Sub-issues for {i['url']}: {subissue_details}")
+
         if args.output == "json":
             import json
             print(json.dumps(issue_details, indent=2))
@@ -512,7 +512,7 @@ if __name__ == "__main__":
                 print(issue.get("title", "No title"), 
                     issue.get("url", ""), 
                     sep=separator)
-            for issue in subissues:
+            for issue in subissue_details:
                 print(issue.get('parent_title', 'No parent title'),
                     issue.get("title", "No title"), 
                     issue.get("url", ""), 
@@ -520,7 +520,7 @@ if __name__ == "__main__":
         else:
             for issue in issue_details:
                 print(issue.get("url", ""))
-            for issue in subissues:
+            for issue in subissue_details:
                 print(issue.get("url", ""))
                     
         
