@@ -9,8 +9,9 @@ Usage: extract_base_queries.py [-h] [--output OUTPUT] [--function_folder FUNCTIO
 import json
 from pathlib import Path
 import re
-from typing import Dict, Set
+from typing import Dict, Set, List
 from datetime import datetime
+import os
 
 class Parameter(object):
     KUSTO_DEFAULT_VALUES = {
@@ -244,6 +245,85 @@ def replace_initialized_parameters(
             query_text = query_text.replace(p.name, p.initialized_name)
     return query_text
 
+def update_schema_references(
+        database_name: str,
+        functions: List[str], 
+        query_text: str
+    ) -> str:
+    modified_lines = []
+    file_modified = False
+    discovered_let_statements = []
+    lines = query_text.splitlines()
+    for line_number, line in enumerate(lines):
+        modified_line = line
+        for function in functions:
+            # If we have already discovered this function in a let statement,
+            # skip further processing for this function
+            if function in discovered_let_statements:
+                continue
+
+            prefix = f"database('{database_name}')"
+            qualified_function = f"{prefix}.{function}"
+            
+            # Skip if the qualified version already exists in this line
+            if qualified_function in modified_line:
+                continue
+            
+            # Find all occurrences of the function name
+            index = 0
+            while index < len(modified_line):
+                index = modified_line.find(function, index)
+                if index == -1:
+                    break
+                    
+                # Check if this function name might already be qualified
+                replace = True
+                decision = False
+                rev_line_number = line_number
+                rev_line = lines[rev_line_number]
+                rev_index = index # use this index initially
+                while not decision and rev_line_number >= 0:
+                    for i in range(rev_index - 1, - 1, -1):
+                        c = rev_line[i]
+                        if c.isspace(): 
+                            continue
+
+                        # check for `let` statement
+                        if c == 't' and i >= 3 and rev_line[i-2:i+1] == 'let':
+                            replace = False # this is a let statement, do not replace
+                            decision = True
+                            discovered_let_statements.append(function)
+                            break
+
+                        replace = c != '.' # this is the only allowable character
+                        decision = True
+                        break
+                    rev_line_number -= 1
+                    rev_line = lines[rev_line_number]
+                    rev_index = len(rev_line) - 1
+
+                if replace:
+                    # Replace this occurrence with the qualified version
+                    modified_line = modified_line[:index] + qualified_function + modified_line[index + len(function):]
+                    file_modified = True
+                    # Skip ahead to avoid infinite loop
+                    index += len(qualified_function)
+                else:
+                    # If we found a non-whitespace character before the function name, skip this occurrence
+                    index += len(function)
+
+                # If we found a let statement, no need to check further for this function in this line
+                if function in discovered_let_statements:
+                    break
+
+        # Append the modified line to the list 
+        modified_lines.append(modified_line)
+    
+    # Only write back if changes were made
+    if file_modified:
+        return "\n".join(modified_lines)
+    return query_text
+
 def generate_kusto_function(
     function_name: str,
     query_text: str,
@@ -350,7 +430,8 @@ def extract(
     function_folder: str = 'extracted',
     create_yaml: bool = False,
     create_functions: bool = False,
-    create_queries: bool = False
+    create_queries: bool = False,
+    cluster_schema_folder: str = str()
 ) -> None:
     """
     Extract Kusto queries from Azure Data Explorer dashboard export file.
@@ -398,6 +479,19 @@ def extract(
         snake_name = camel_to_snake(name_without_prefix)
         output_function_names[bq_name] = snake_name
 
+    # Load all datasources and functions currently in cluster
+    function_names_by_database = dict[str, List[str]]()
+    if cluster_schema_folder:
+        for root, _, files in os.walk(cluster_schema_folder):
+            if os.path.basename(root) != "functions": 
+                continue
+            database_name = os.path.basename(os.path.dirname(root))
+            database_functions = function_names_by_database.setdefault(database_name, [])
+            for file in files:
+                if file.endswith('.yml'):
+                    function_name = os.path.splitext(file)[0]
+                    database_functions.append(function_name)
+
     # Keep track of what we've processed
     processed_count = 0
 
@@ -412,9 +506,14 @@ def extract(
         query = queries_by_id[query_id]
         datasource_info = query.get('dataSource', {})
         datasource_id = datasource_info.get('dataSourceId')
-        
         if not datasource_id or datasource_id not in datasources_by_id:
             print(f"Warning: No data source found for query ID {query_id}")
+            continue
+
+        # In which database was this query defined?
+        database_name = datasources_by_id.get(datasource_id, {}).get('database')
+        if not database_name:
+            print(f"Warning: No database name found for datasource ID {datasource_id}")
             continue
 
         # In ADE dashboards, base queries are defined inline and capture parameters from their parent scope.
@@ -440,6 +539,17 @@ def extract(
         # Deal with parameters
         query_parameters = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, query_id)
         query_text_modified = replace_initialized_parameters(query_text_modified, query_parameters)
+
+        # Reference schemas explicitly 
+        if function_names_by_database:
+            # load the functions in the original database for this query
+            functions = function_names_by_database.get(database_name)
+            if functions:
+                query_text_modified = update_schema_references(
+                    database_name=database_name,
+                    functions=functions,
+                    query_text=query_text_modified)
+                    
 
         # Generate docstring and function name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
@@ -493,6 +603,7 @@ if __name__ == '__main__':
     parser.add_argument("--yaml", action="store_true", help="Emit YAML files")
     parser.add_argument("--functions", action="store_true", help="Emit create-or-alter function definition files")
     parser.add_argument("--queries", action="store_true", help="Emit ADE-style basequery amalgams")
+    parser.add_argument("--cluster_schema_folder", "-cs", help="Directory containing definition files for all databases in the cluster")
     args = parser.parse_args()
 
     extract(
@@ -502,5 +613,6 @@ if __name__ == '__main__':
         args.function_folder,
         create_yaml=args.yaml,
         create_functions=args.functions,
-        create_queries=args.queries
+        create_queries=args.queries,
+        cluster_schema_folder=args.cluster_schema_folder
     )
