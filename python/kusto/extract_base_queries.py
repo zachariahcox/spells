@@ -1,17 +1,55 @@
 """
-This script extracts Kusto queries from an Azure Data Explorer dashboard export file.
-It is used to extract base queries into a format that can be stored in version control. 
+Extract Kusto Queries from Azure Data Explorer Dashboard Files
+==============================================================
 
-Dashboard exports follow this schema: https://dataexplorer.azure.com/static/d/schema/60/dashboard.json
+This script extracts Kusto queries from an Azure Data Explorer dashboard export file
+and converts them into reusable KQL functions, raw queries, or YAML definitions.
 
-Usage: extract_base_queries.py [-h] [--output OUTPUT] [--function_folder FUNCTION_FOLDER] dashboard_file
+Dashboard exports follow the schema: https://dataexplorer.azure.com/static/d/schema/60/dashboard.json
+
+Features:
+---------
+- Extracts all base queries from dashboards
+- Automatically detects query parameters and their dependencies
+- Generates proper function signatures with correct parameter types
+- Supports both KQL function format and YAML format (for use with https://github.com/github/KustoSchemaTools)
+- Preserves query dependencies and structure
+- Automatic conversion of camelCase names to snake_case
+- Special handling for time range parameters (_startTime, _endTime)
+
+Usage:
+------
+```
+python extract_base_queries.py [options] dashboard_file.json
+
+Options:
+  -h, --help                      Show this help message and exit
+  --output OUTPUT, -o OUTPUT      Output directory for extracted queries (default: 'extracted')
+  --output_database <database>, -fs <database>  Functions will be created in this database schema (default: 'extracted')
+  --output_function_folder FOLDER, -ff FOLDER  Folder name to use within Kusto (default: 'extracted')
+  --yaml                          Generate YAML files for KustoSchemaTools
+  --functions                     Generate regular Kql function declarations (create-or-alter)
+  --queries                       Generate .kql files with raw queries
+  --cluster_databases_folder FOLDER, -cs FOLDER  Path to KustoSchemaTools folder containing folders for each database definition
+```
+
+Examples:
+---------
+# Basic extraction to default folder (no output files created unless you specify options):
+python extract_base_queries.py dashboard.json
+
+# Extract to specific folder with all output types:
+python extract_base_queries.py --output queries --yaml --functions --queries dashboard.json
+
+# Generate only YAML files with custom function folder:
+python extract_base_queries.py --output_function_folder "team/dashboard/awesome" --output_database "mydb" --cluster_databases_folder path/to/KustoSchemaTools/root/ --yaml dashboard.json
+
 """
 import json
-from pathlib import Path
+import os
 import re
 from typing import Dict, Set, List
 from datetime import datetime
-import os
 
 class Parameter(object):
     KUSTO_DEFAULT_VALUES = {
@@ -26,13 +64,14 @@ class Parameter(object):
         'dynamic': 'dynamic(null)'    # Empty dynamic object
     }
 
-    def __init__(self, name: str, 
-                 kind: str, 
-                 selection_type: str,
-                 default_value: str = "",
-                 initializer: str = "",
-                 initialized_name: str = ""
-                 ):
+    def __init__(self, 
+        name: str, 
+        kind: str, 
+        selection_type: str,
+        default_value: str = "",
+        initializer: str = "",
+        initialized_name: str = ""
+        ):
         self.name = name
         self.kind = kind
         self.selection_type = selection_type
@@ -417,7 +456,10 @@ def camel_to_snake(name):
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
 
 def save(path, content):
-    path.parent.mkdir(parents=True, exist_ok=True)
+    # Create parent directory if it doesn't exist
+    dir_path = os.path.dirname(path)
+    if dir_path and not os.path.exists(dir_path):
+        os.makedirs(dir_path, exist_ok=True)
     with open(path, 'w') as f:
         f.write(content)
         if not content.endswith('\n'):
@@ -426,12 +468,12 @@ def save(path, content):
 def extract(
     dashboard_file_path: str,
     output_folder: str = 'extracted',
-    function_schema: str = 'extracted',
-    function_folder: str = 'extracted',
+    output_database_name: str = 'extracted',
+    output_function_folder: str = 'extracted',
     create_yaml: bool = False,
     create_functions: bool = False,
     create_queries: bool = False,
-    cluster_schema_folder: str = str()
+    cluster_databases_folder: str = str()
 ) -> None:
     """
     Extract Kusto queries from Azure Data Explorer dashboard export file.
@@ -439,9 +481,12 @@ def extract(
     Args:
         dashboard_file_path: Path to the dashboard JSON file
         output_folder: Folder to save extracted queries in
-        function_schema: Schema to use for the functions
-        function_folder: Folder name to use in the function docstring and creation command
-        yaml_only: Whether to only emit YAML files (no KQL or raw queries)
+        output_database_name: Schema name to use for function references in generated code
+        output_function_folder: Folder name to use in the function docstring and creation command
+        create_yaml: Whether to generate YAML files for KustoSchemaTools
+        create_functions: Whether to generate .kql files with function declarations
+        create_queries: Whether to generate .kql files with raw queries
+        cluster_databases_folder: Path to folder containing cluster schema files for resolving references
     """
     print(f"Loading dashboard file: {dashboard_file_path}")
     with open(dashboard_file_path, 'r') as f:
@@ -475,14 +520,14 @@ def extract(
     # Generate new names for base queries
     output_function_names = {}
     for bq_name, _ in base_queries_by_name.items():
-        name_without_prefix = bq_name.replace('BQ', function_folder.lower())
+        name_without_prefix = bq_name.replace('BQ', output_function_folder.lower())
         snake_name = camel_to_snake(name_without_prefix)
         output_function_names[bq_name] = snake_name
 
     # Load all datasources and functions currently in cluster
     function_names_by_database = dict[str, List[str]]()
-    if cluster_schema_folder:
-        for root, _, files in os.walk(cluster_schema_folder):
+    if cluster_databases_folder:
+        for root, _, files in os.walk(cluster_databases_folder):
             if os.path.basename(root) != "functions": 
                 continue
             database_name = os.path.basename(os.path.dirname(root))
@@ -533,7 +578,7 @@ def extract(
                 function_name=output_function_names.get(referenced_base_query_name, referenced_base_query_name), 
                 parameters=parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, referenced_bq_query_id)
                 )
-            fully_qualified_name = f"database('{function_schema}').{sig}"
+            fully_qualified_name = f"database('{output_database_name}').{sig}"
             query_text_modified = query_text_modified.replace(referenced_base_query_name, fully_qualified_name)
 
         # Deal with parameters
@@ -558,9 +603,8 @@ def extract(
 
         # Generate the output contents
         # Create output folder if it doesn't exist
-        output_path = Path(output_folder)
         if create_functions or create_yaml or create_queries:
-            output_path.mkdir(exist_ok=True)
+            os.makedirs(output_folder, exist_ok=True)
 
         if create_functions:
             final_text = generate_kusto_function(
@@ -568,9 +612,9 @@ def extract(
                 query_text=query_text_modified,
                 query_parameters=query_parameters,
                 docstring=docstring,
-                function_folder=function_folder
+                function_folder=output_function_folder
             )
-            save(output_path / f"create_{function_name}.kql", final_text)
+            save(os.path.join(output_folder, f"create_{function_name}.kql"), final_text)
 
         if create_yaml:
             final_text = generate_yaml_function(
@@ -578,9 +622,9 @@ def extract(
                 query_text=query_text_modified,
                 query_parameters=query_parameters,
                 docstring=docstring,
-                function_folder=function_folder
+                function_folder=output_function_folder
             )
-            save(output_path / f"{function_name}.yml", final_text)
+            save(os.path.join(output_folder, f"{function_name}.yml"), final_text)
 
         if create_queries:
             final_text = generate_kusto_query(
@@ -588,7 +632,7 @@ def extract(
                 query_text=query_text, # do not use modified version
                 query_parameters=query_parameters
             )
-            save(output_path / f"{function_name}.kusto", final_text)
+            save(os.path.join(output_folder, f"{function_name}.kusto"), final_text)
 
         processed_count += 1
     print(f"Extracted {processed_count} base queries from dashboard '{dashboard_file_path}' into '{output_folder}'")
@@ -598,21 +642,21 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Extract Kusto queries from Azure Data Explorer dashboard export")
     parser.add_argument("dashboard_file", help="Path to the dashboard JSON file")
     parser.add_argument("--output", "-o", default="extracted", help="Where to save output files")
-    parser.add_argument("--function_schema", "-fs", default="extracted", help="Which schema will contain these functions?")
-    parser.add_argument("--function_folder", "-ff", default="extracted", help="Where to create functions in the kusto database's /functions dir")
+    parser.add_argument("--output_database", "-fs", default="extracted", help="Which database will contain these functions?")
+    parser.add_argument("--output_function_folder", "-ff", default="extracted", help="Where should Kusto display these functions?")
     parser.add_argument("--yaml", action="store_true", help="Emit YAML files")
     parser.add_argument("--functions", action="store_true", help="Emit create-or-alter function definition files")
     parser.add_argument("--queries", action="store_true", help="Emit ADE-style basequery amalgams")
-    parser.add_argument("--cluster_schema_folder", "-cs", help="Directory containing definition files for all databases in the cluster")
+    parser.add_argument("--cluster_databases_folder", "-cs", help="Directory containing definition files for all databases in the cluster")
     args = parser.parse_args()
 
     extract(
         args.dashboard_file, 
         args.output,
-        args.function_schema,
-        args.function_folder,
+        args.output_database,
+        args.output_function_folder,
         create_yaml=args.yaml,
         create_functions=args.functions,
         create_queries=args.queries,
-        cluster_schema_folder=args.cluster_schema_folder
+        cluster_databases_folder=args.cluster_databases_folder
     )
