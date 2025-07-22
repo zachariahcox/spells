@@ -78,6 +78,27 @@ class Parameter(object):
         self.default_value = default_value
         self.initializer = initializer
         self.initialized_name = initialized_name
+    
+    def default_value_initializer(self):
+        """
+        Format the default value for use in KQL or YAML.
+        Ensures string values are properly quoted only when needed.
+        
+        Returns:
+            - For non-scalar types: always returns dynamic(null)
+            - For string scalar types: returns quoted string if not already quoted
+            - For other scalar types: returns the value as is
+        """
+        if self.selection_type != 'scalar':
+            return "dynamic(null)"
+            
+        value = self.default_value
+        
+        # Only quote string values if they're scalar and not already quoted
+        if self.kind == 'string' and value and not (value.startswith('"') and value.endswith('"')):
+            return f'"{value}"'
+        
+        return value
 
     @property
     def default_value(self) -> str:
@@ -110,7 +131,8 @@ class Parameter(object):
         
         # build a default initializer
         if self.selection_type == 'scalar':
-            i = f"let {self.name} = {self.default_value};"
+            value = self.default_value_initializer()
+            i = f"let {self.name} = {value};"
         else:
             i = f"let {self.name} = dynamic({self.default_value});"
 
@@ -267,8 +289,11 @@ def function_call_signature(
 def function_definition_parameters(
     parameters: list[Parameter]
 ) -> list[str]:
-    return [f"{p.name}:{p.kind_with_selection()}={p.default_value}"
-            for p in parameters]
+    result = []
+    for p in parameters:
+        value = p.default_value_initializer()
+        result.append(f"{p.name}:{p.kind_with_selection()}={value}")
+    return result
 
 def get_parameter_initializers(
     query_parameters: list[Parameter]
@@ -599,7 +624,7 @@ def extract(
         # Generate docstring and function name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
         function_name = output_function_names.get(bq_name, bq_name)
-        docstring=f"{bq_name} exported from dashboard {dashboard_title} on {datetime.now().strftime('%Y-%m-%d')}"
+        docstring=f"{bq_name} exported from dashboard {dashboard_title} using extract_base_queries.py"
 
         # Generate the output contents
         # Create output folder if it doesn't exist
