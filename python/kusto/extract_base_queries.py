@@ -396,7 +396,7 @@ def generate_kusto_function(
     function_folder: str
 ) -> str:
     lines = [
-        f'.create-or-alter function {function_name} with (',
+        f'.create-or-alter function with (',
         f'  docstring="{docstring}",',
         f'  folder="{function_folder}"',
         f')'
@@ -406,9 +406,8 @@ def generate_kusto_function(
     function_parameters = ""
     parameter_initializers = []
     if query_parameters:
-        separator = f',\n{4 * " "}'
         params = function_definition_parameters(query_parameters)
-        function_parameters += separator + separator.join(params) + "\n"
+        function_parameters += f"\n{4*' '}" + f',\n{4 * " "}'.join(params) + "\n"
         parameter_initializers = get_parameter_initializers(query_parameters)
 
     # build function body
@@ -498,6 +497,7 @@ def extract(
     create_yaml: bool = False,
     create_functions: bool = False,
     create_queries: bool = False,
+    create_functions_single_file: bool = False,
     cluster_databases_folder: str = str()
 ) -> None:
     """
@@ -511,6 +511,7 @@ def extract(
         create_yaml: Whether to generate YAML files for KustoSchemaTools
         create_functions: Whether to generate .kql files with function declarations
         create_queries: Whether to generate .kql files with raw queries
+        create_functions_single_file: Whether to generate a single file with all function declarations concatenated
         cluster_databases_folder: Path to folder containing cluster schema files for resolving references
     """
     print(f"Loading dashboard file: {dashboard_file_path}")
@@ -564,6 +565,10 @@ def extract(
 
     # Keep track of what we've processed
     processed_count = 0
+    
+    # Container for all function definitions if functions_single_file is enabled
+    # As a single file, this only works with sufficient permissions, but that's logically what we're doing here.
+    all_function_texts = [".execute database script <|"]
 
     # Extract each base query
     for base_query_id, base_query in base_queries_by_id.items():
@@ -628,10 +633,10 @@ def extract(
 
         # Generate the output contents
         # Create output folder if it doesn't exist
-        if create_functions or create_yaml or create_queries:
+        if create_functions or create_yaml or create_queries or create_functions_single_file:
             os.makedirs(output_folder, exist_ok=True)
 
-        if create_functions:
+        if create_functions or create_functions_single_file:
             final_text = generate_kusto_function(
                 function_name=function_name,
                 query_text=query_text_modified,
@@ -639,8 +644,12 @@ def extract(
                 docstring=docstring,
                 function_folder=output_function_folder
             )
-            save(os.path.join(output_folder, f"create_{function_name}.kql"), final_text)
-
+            
+            if create_functions:
+                save(os.path.join(output_folder, f"create_{function_name}.kql"), final_text)
+            
+            if create_functions_single_file:
+                all_function_texts.append(final_text)
         if create_yaml:
             final_text = generate_yaml_function(
                 function_name=function_name,
@@ -660,6 +669,12 @@ def extract(
             save(os.path.join(output_folder, f"{function_name}.kusto"), final_text)
 
         processed_count += 1
+        
+    # Save all functions in a single file if requested
+    if create_functions_single_file and all_function_texts:
+        combined_text = '\n'.join(all_function_texts)
+        save(os.path.join(output_folder, f"{output_function_folder}_all_functions.kql"), combined_text)
+        
     print(f"Extracted {processed_count} base queries from dashboard '{dashboard_file_path}' into '{output_folder}'")
 
 if __name__ == '__main__':
@@ -672,6 +687,7 @@ if __name__ == '__main__':
     parser.add_argument("--yaml", action="store_true", help="Emit YAML files")
     parser.add_argument("--functions", action="store_true", help="Emit create-or-alter function definition files")
     parser.add_argument("--queries", action="store_true", help="Emit ADE-style basequery amalgams")
+    parser.add_argument("--functions_single_file", "-fsf", action="store_true", help="Emit a single file with all create-or-alter function definitions concatenated")
     parser.add_argument("--cluster_databases_folder", "-cs", help="Directory containing definition files for all databases in the cluster")
     args = parser.parse_args()
 
@@ -683,5 +699,6 @@ if __name__ == '__main__':
         create_yaml=args.yaml,
         create_functions=args.functions,
         create_queries=args.queries,
+        create_functions_single_file=args.functions_single_file,
         cluster_databases_folder=args.cluster_databases_folder
     )
