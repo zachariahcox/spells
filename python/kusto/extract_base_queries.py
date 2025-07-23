@@ -49,7 +49,6 @@ import json
 import os
 import re
 from typing import Dict, Set, List
-from datetime import datetime
 
 class Parameter(object):
     KUSTO_DEFAULT_VALUES = {
@@ -498,6 +497,7 @@ def extract(
     create_functions: bool = False,
     create_queries: bool = False,
     create_functions_single_file: bool = False,
+    create_new_dashboard: bool = False,
     cluster_databases_folder: str = str()
 ) -> None:
     """
@@ -512,6 +512,7 @@ def extract(
         create_functions: Whether to generate .kql files with function declarations
         create_queries: Whether to generate .kql files with raw queries
         create_functions_single_file: Whether to generate a single file with all function declarations concatenated
+        create_new_dashboard: Whether to create a new dashboard JSON file with base queries replaced by function references
         cluster_databases_folder: Path to folder containing cluster schema files for resolving references
     """
     print(f"Loading dashboard file: {dashboard_file_path}")
@@ -624,7 +625,6 @@ def extract(
                     database_name=database_name,
                     functions=functions,
                     query_text=query_text_modified)
-                    
 
         # Generate docstring and function name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
@@ -675,6 +675,80 @@ def extract(
         combined_text = '\n'.join(all_function_texts)
         save(os.path.join(output_folder, f"{output_function_folder}_all_functions.kql"), combined_text)
         
+    # Create a new dashboard with function references instead of base queries
+    if create_new_dashboard:   
+        # Create a deep copy of the dashboard to modify
+        extracted_dashboard = json.loads(json.dumps(dashboard))
+        
+        # First, identify all queries that are referenced by base queries
+        base_query_ids = set()
+        for bq in dashboard.get('baseQueries', []):
+            if 'queryId' in bq:
+                base_query_ids.add(bq['queryId'])
+        
+        # Map of queries to remove later
+        query_indices_to_remove = []
+        
+        # For all queries in the dashboard
+        for i, query in enumerate(extracted_dashboard.get('queries', [])):
+            # If this query is only used by a base query, mark it for removal
+            if query.get('id') in base_query_ids:
+                # this is a base query, we will no longer need it. 
+                # store index for quick removal
+                query_indices_to_remove.append(i)
+                continue
+                
+            query_text = query.get('text', '')
+            used_variables = query.get('usedVariables', [])
+            
+            # Replace base query references with function calls
+            for var_name in used_variables[:]:  # Use a copy to safely modify during iteration
+                if var_name in base_queries_by_name:
+                    # Get the corresponding base query and its function name
+                    bq = base_queries_by_name[var_name]
+                    bq_query_id = bq.get('queryId')
+                    if not bq_query_id:
+                        continue
+                    
+                    # Load replacement function name
+                    function_name = output_function_names.get(var_name, var_name)
+                    
+                    # Build function call signature
+                    params = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id)
+                    sig = function_call_signature(function_name, params)
+                    qualified_function_call = f"database('{output_database_name}').{sig}"
+                    
+                    # Replace variable reference with function call in query text
+                    query_text = query_text.replace(var_name, qualified_function_call)
+                    
+                    # Remove this base query from usedVariables
+                    used_variables.remove(var_name)
+
+                    # Add parameters as usedVariables if they are not already present
+                    for param in params:
+                        if param.name not in used_variables:
+                            used_variables.append(param.name)
+            
+            # Update the query with modified text and variables
+            query['text'] = query_text
+            query['usedVariables'] = used_variables
+        
+        # Remove queries that were only used by base queries (in reverse order to avoid index issues)
+        for i in reversed(query_indices_to_remove):
+            del extracted_dashboard['queries'][i]
+        
+        # Remove baseQueries section from the dashboard
+        if 'baseQueries' in extracted_dashboard:
+            extracted_dashboard['baseQueries'] = []
+        
+        # Save the modified dashboard
+        base_name, ext = os.path.splitext(dashboard_file_path)
+        extracted_dashboard_output = f"{base_name}-extracted{ext}"
+        with open(extracted_dashboard_output, 'w') as f:
+            json.dump(extracted_dashboard, f, indent=2)
+
+        print(f"Created updated dashboard file: {extracted_dashboard_output}")
+
     print(f"Extracted {processed_count} base queries from dashboard '{dashboard_file_path}' into '{output_folder}'")
 
 if __name__ == '__main__':
@@ -689,6 +763,7 @@ if __name__ == '__main__':
     parser.add_argument("--queries", action="store_true", help="Emit ADE-style basequery amalgams")
     parser.add_argument("--functions_single_file", "-fsf", action="store_true", help="Emit a single file with all create-or-alter function definitions concatenated")
     parser.add_argument("--cluster_databases_folder", "-cs", help="Directory containing definition files for all databases in the cluster")
+    parser.add_argument("--create_new_dashboard", "-nd", help="Whether to create a new dashboard JSON file with base queries replaced by calls to extracted functions", action="store_true")
     args = parser.parse_args()
 
     extract(
@@ -700,5 +775,6 @@ if __name__ == '__main__':
         create_functions=args.functions,
         create_queries=args.queries,
         create_functions_single_file=args.functions_single_file,
+        create_new_dashboard=args.create_new_dashboard,
         cluster_databases_folder=args.cluster_databases_folder
     )
