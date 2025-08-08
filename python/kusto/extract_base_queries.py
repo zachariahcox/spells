@@ -51,6 +51,10 @@ import re
 from typing import Dict, Set, List
 
 class Parameter(object):
+    RESERVED = {
+        '_startTime': ('_startTimeInitialized', "coalesce(_startTime, startofday(ago(7d)))"),
+        '_endTime': ('_endTimeInitialized', "coalesce(_endTime, endofday(now()))"),
+    }
     KUSTO_DEFAULT_VALUES = {
         'string': '""',               # Empty string
         'long': 'long(0)',            # Integer zero
@@ -63,134 +67,121 @@ class Parameter(object):
         'dynamic': 'dynamic(null)'    # Empty dynamic object
     }
 
-    def __init__(self, 
-        name: str, 
-        kind: str, 
+    def __init__(self,
+        name: str,
+        kind: str,
         selection_type: str,
-        default_value: str = "",
-        initializer: str = "",
-        initialized_name: str = ""
+        default_value: str = ""
         ):
         self.name = name
         self.kind = kind
         self.selection_type = selection_type
         self.default_value = default_value
-        self.initializer = initializer
-        self.initialized_name = initialized_name
-    
-    def default_value_initializer(self):
-        """
-        Format the default value for use in KQL or YAML.
-        Ensures string values are properly quoted only when needed.
-        
-        Returns:
-            - For non-scalar types: always returns dynamic(null)
-            - For string scalar types: returns quoted string if not already quoted
-            - For other scalar types: returns the value as is
-        """
-        if self.selection_type != 'scalar':
-            return "dynamic(null)"
-            
-        value = self.default_value
-        
-        # Only quote string values if they're scalar and not already quoted
-        if self.kind == 'string' and value and not (value.startswith('"') and value.endswith('"')):
-            return f'"{value}"'
-        
-        return value
 
     @property
     def default_value(self) -> str:
         if self._default_value:
             return self._default_value
 
-        if self.selection_type != 'scalar':
-            return "dynamic(null)" # return dynamic(null) for any list
-        
-        self._default_value = Parameter.KUSTO_DEFAULT_VALUES.get(self.kind, 'dynamic(null)')
+        if self.selection_type == 'scalar':
+            self._default_value = Parameter.KUSTO_DEFAULT_VALUES.get(self.kind, 'dynamic(null)')
+        else:
+            self._default_value = "dynamic(null)"  # For lists, we use dynamic(null)
         return self._default_value
 
     @default_value.setter
     def default_value(self, value: str):
-        self._default_value = value
-  
-    def kind_with_selection(self) -> str:
-        if self.selection_type == 'scalar':
-            return self.kind
-        return 'dynamic'  # For lists, we use dynamic type
+        if self.kind == 'string' and value and not (value.startswith('"') and value.endswith('"')):
+            self._default_value = f'"{value}"' # ensure quoted strings
+        else:
+            self._default_value = value
 
     @property
-    def initializer(self) -> str:
-        """
-        Returns a Kusto initializer for this parameter.
-        This is used in the function body to set default values.
-        """
-        if self._initializer:
-            return self._initializer
-        
-        # build a default initializer
-        if self.selection_type == 'scalar':
-            value = self.default_value_initializer()
-            i = f"let {self.name} = {value};"
-        else:
-            i = f"let {self.name} = dynamic({self.default_value});"
+    def data_type(self) -> str:
+        return self.kind if self.selection_type == 'scalar' else 'dynamic'
 
-        self._initializer = i
-        return i
-    
-    @initializer.setter
-    def initializer(self, value: str):
-        self._initializer = value
+    @property
+    def function_name(self) -> str:
+        # if parameter name has a leading "_" remove it
+        if self.name and self.name[0] == "_":
+            return self.name[1:]
+        return self.name
+
+    @property
+    def requires_custom_initializer(self) -> bool:
+        return self.name in Parameter.RESERVED
+
+    @property
+    def function_initializer(self) -> str:
+        if self.function_name == self.name:
+            return ""
+
+        # if we have a reserved parameter, we need to use the custom initializer
+        if self.name in Parameter.RESERVED:
+            return f"let {self.initialized_name} = {Parameter.RESERVED[self.name][1].replace(self.name, self.function_name)};"
+
+        # because we renamed the parameter, we need to map it back here.
+        return f"let {self.name} = {self.function_name};"
 
     @property
     def initialized_name(self) -> str:
-        if self._initialized_name:
-            return self._initialized_name
-        return ""
-    @initialized_name.setter
-    def initialized_name(self, value: str):
-        self._initialized_name = value
+        if self.name in Parameter.RESERVED:
+            return Parameter.RESERVED[self.name][0]  # Using direct dictionary access
+        return self.name
+
+    @property
+    def custom_initializer(self) -> str:
+        """
+        Returns code to initialize a parameter in the body of a query.
+        """
+        # return custom initializer for ranges
+        if self.name in Parameter.RESERVED:
+            return f"let {self.initialized_name} = {Parameter.RESERVED[self.name][1]};"
+
+        # there was no custom code, so build a default initializer
+        if self.selection_type == 'scalar':
+            i = f"let {self.name} = {self.default_value};"
+        else:
+            i = f"let {self.name} = dynamic({self.default_value});"
+
+        self._custom_initializer = i
+        return i
 
 # Cache for used parameters to avoid redundant calculations
 QUERY_PARAMETERS: Dict[str, Set[str]] = {}
 
-RESERVED_PARAMETERS = {
-    '_startTime': ('_startTimeInitialized', "let _startTimeInitialized = coalesce(_startTime, startofday(ago(7d)));"),
-    '_endTime': ('_endTimeInitialized', "let _endTimeInitialized = coalesce(_endTime, endofday(now()));"),
-}
-
 def parameters_for_query(
-    base_queries_by_name, 
+    base_queries_by_name,
     parameters_by_name,
     queries_by_id,
     query_id
 ) -> list[Parameter]:
     """
     What parameters are needed to power this query?
-    
+
     This function analyzes a query and its dependencies to determine which parameters are used.
     It returns a list of tuples containing the parameter name, type, and selection type.
-    
+
     The parameters are sorted such that '_startTime' and '_endTime' appear first, followed by other parameters.
-    
+
     Args:
         base_queries_by_name: Dictionary mapping variable names to base queries
         parameters_by_name: Dictionary mapping parameter names to parameter objects
         queries_by_id: Dictionary mapping query IDs to query objects
         query_id: ID of the query to analyze
-        
+
     Returns:
         List of tuples (parameter_name, parameter_type, selection_type)
     """
-    def get_referenced_parameters(
-        base_queries_by_name, 
-        queries_by_id, 
-        query_id, 
+    def load_parameter_names(
+        base_queries_by_name,
+        queries_by_id,
+        query_id,
         in_progress=None
         ) -> Set[str]:
         """
-        Recursively find all parameters used by a query, accounting for dependencies on other queries.
-        
+        Recursively find all parameter names used by a query, accounting for dependencies on other queries.
+
         Args:
             base_queries_by_name: Dictionary mapping variable names to base queries
             queries_by_id: Dictionary mapping query IDs to query objects
@@ -201,38 +192,38 @@ def parameters_for_query(
             Set of parameter names used by this query and its dependencies
         """
         global QUERY_PARAMETERS
-        
+
         # Return cached result if available
         if query_id in QUERY_PARAMETERS:
             return QUERY_PARAMETERS[query_id]
-        
+
         # Initialize in-progress queries set if not provided
         if in_progress is None:
             in_progress = set()
-        
+
         # Prevent circular dependencies
         if query_id in in_progress:
             print(f"Warning: Circular dependency detected for query ID {query_id}")
             return set()  # Return empty set for circular references
-        
+
         # Mark this query as in-progress
         in_progress.add(query_id)
-        
+
         # Get the query and initialize parameters
         query = queries_by_id.get(query_id)
         if query is None:
             print(f"Warning: Query ID {query_id} not found")
             in_progress.remove(query_id)  # Remove from in-progress set before returning
             return set()
-        
-        parameters = set()
+
+        parameter_names = set()
         text = query.get('text', '')
-        
+
         # Check for _startTime and _endTime in used variables in query text
         for p in ('_startTime', '_endTime'):
             if p in text:
-                parameters.add(p)
-        
+                parameter_names.add(p)
+
         # Process each used variable
         for var in query.get('usedVariables', []):
             if var in base_queries_by_name:
@@ -240,77 +231,70 @@ def parameters_for_query(
                 bq_query_id = bq.get('queryId')
                 if not bq_query_id:
                     continue
-                parameters.update(get_referenced_parameters(
-                    base_queries_by_name, 
-                    queries_by_id, 
-                    bq_query_id, 
+                parameter_names.update(load_parameter_names(
+                    base_queries_by_name,
+                    queries_by_id,
+                    bq_query_id,
                     in_progress
                 ))
             else:
                 # Otherwise, it's a parameter
-                parameters.add(var)
+                parameter_names.add(var)
 
         # Cache results for future calls
-        QUERY_PARAMETERS[query_id] = parameters
-        
+        QUERY_PARAMETERS[query_id] = parameter_names
+
         # Remove from in-progress set now that we're done with this branch
         in_progress.remove(query_id)
-        
-        return parameters
+
+        return parameter_names
 
     result= []
-    names = get_referenced_parameters(base_queries_by_name, queries_by_id, query_id)
-    for p, (initialized_name, initializer) in RESERVED_PARAMETERS.items():
+    names = load_parameter_names(base_queries_by_name, queries_by_id, query_id)
+
+    # Add reserved parameters first if they are used
+    for p, (name, custom_code) in Parameter.RESERVED.items():
         if p in names:
-            param = Parameter(p, 'datetime', "scalar", 
-                        initializer=initializer, 
-                        initialized_name=initialized_name)
+            param = Parameter(name=p,
+                              kind='datetime',
+                              selection_type="scalar",
+                              default_value="")
             result.append(param)
 
     # Collect other parameters, force stable order
     for p in sorted(names):
-        if p in RESERVED_PARAMETERS.keys():
+        if p in Parameter.RESERVED.keys():
             continue
-        param = Parameter(p, 
-            kind=parameters_by_name[p]["kind"].lower(), 
-            selection_type=parameters_by_name[p]["selectionType"].lower(),
-            default_value=parameters_by_name[p].get("defaultValue", {}).get('value', ''),
+        parameter_metadata = parameters_by_name[p]
+        param = Parameter(p,
+            kind=parameter_metadata["kind"].lower(),
+            selection_type=parameter_metadata["selectionType"].lower(),
+            default_value=parameter_metadata.get("defaultValue", {}).get('value', ''),
             )
         result.append(param)
     return result
 
-def function_call_signature(
-    function_name: str, 
-    parameters: list[Parameter]
-) -> str:
+def function_call_signature(function_name: str, parameters: list[Parameter]) -> str:
     return f"{function_name}({', '.join(param.name for param in parameters)})"
 
-def function_definition_parameters(
-    parameters: list[Parameter]
-) -> list[str]:
-    result = []
-    for p in parameters:
-        value = p.default_value_initializer()
-        result.append(f"{p.name}:{p.kind_with_selection()}={value}")
-    return result
+def function_definition_parameters(parameters: list[Parameter]) -> list[str]:
+    return [f"{p.function_name}:{p.data_type}={p.default_value}" for p in parameters]
 
-def get_parameter_initializers(
-    query_parameters: list[Parameter]
-) -> list[str]:
-    return [p.initializer for p in query_parameters if p.initialized_name]
+def custom_function_parameter_initializers(parameters: list[Parameter]) -> list[str]:
+    return [p.function_initializer for p in parameters]
 
 def replace_initialized_parameters(
-        query_text: str, 
+        query_text: str,
         parameters: list[Parameter]
         ) -> str:
     for p in parameters:
-        if p.initialized_name:
+        if p.requires_custom_initializer:
             query_text = query_text.replace(p.name, p.initialized_name)
     return query_text
 
 def update_schema_references(
         database_name: str,
-        functions: List[str], 
+        functions: List[str],
         query_text: str
     ) -> str:
     modified_lines = []
@@ -327,18 +311,18 @@ def update_schema_references(
 
             prefix = f"database('{database_name}')"
             qualified_function = f"{prefix}.{function}"
-            
+
             # Skip if the qualified version already exists in this line
             if qualified_function in modified_line:
                 continue
-            
+
             # Find all occurrences of the function name
             index = 0
             while index < len(modified_line):
                 index = modified_line.find(function, index)
                 if index == -1:
                     break
-                    
+
                 # Check if this function name might already be qualified
                 replace = True
                 decision = False
@@ -346,9 +330,9 @@ def update_schema_references(
                 rev_line = lines[rev_line_number]
                 rev_index = index # use this index initially
                 while not decision and rev_line_number >= 0:
-                    for i in range(rev_index - 1, - 1, -1):
+                    for i in range(rev_index - 1, -1, -1):
                         c = rev_line[i]
-                        if c.isspace(): 
+                        if c.isspace():
                             continue
 
                         # check for `let` statement
@@ -379,9 +363,9 @@ def update_schema_references(
                 if function in discovered_let_statements:
                     break
 
-        # Append the modified line to the list 
+        # Append the modified line to the list
         modified_lines.append(modified_line)
-    
+
     # Only write back if changes were made
     if file_modified:
         return "\n".join(modified_lines)
@@ -400,19 +384,22 @@ def generate_kusto_function(
         f'  folder="{function_folder}"',
         f')'
         ]
-    
+
     # build signature
     function_parameters = ""
-    parameter_initializers = []
     if query_parameters:
         params = function_definition_parameters(query_parameters)
         function_parameters += f"\n{4*' '}" + f',\n{4 * " "}'.join(params) + "\n"
-        parameter_initializers = get_parameter_initializers(query_parameters)
 
     # build function body
     lines.append(f"{function_name}({function_parameters}){{")
-    if parameter_initializers:
-        lines.append("\n".join(parameter_initializers))
+
+    if query_parameters:
+        # add custom initiatlizers if needed
+        initializers = custom_function_parameter_initializers(query_parameters)
+        if initializers:
+            lines.append("\n".join(initializers))
+
     lines.append(query_text)
     lines.append(f"}}")
 
@@ -430,17 +417,17 @@ def generate_kusto_query(
     if query_parameters:
         # Create let statements for parameters
         query_lines.append(f"// Parameters -- begin")
-        query_lines.extend([p.initializer for p in query_parameters])
+        query_lines.extend([p.custom_initializer for p in query_parameters])
         query_lines.append(f"// Parameters -- end")
         query_lines.append("//")  # Empty line for separation
-        
+
     query_lines.append(f"// {bq_name} -- begin")
     query_lines.append(query_text)
     query_lines.append(f"// {bq_name} -- end")
     return '\n'.join(query_lines)
 
 def generate_yaml_function(
-    function_name: str,
+    file_name: str,
     query_text: str,
     query_parameters: list[Parameter],
     docstring: str,
@@ -449,7 +436,7 @@ def generate_yaml_function(
     # Build the YAML document
     yaml_lines = [
         f"folder: {function_folder}",
-        f"docString: {docstring}",
+        f"docString: {os.path.basename(__file__)}/{file_name}",
         f"preformatted: true", # should be preformatted to work with KustoSchemaTools https://github.com/github/KustoSchemaTools
     ]
 
@@ -458,19 +445,19 @@ def generate_yaml_function(
         # Create a comma-separated list of parameters with their default values
         params = ','.join(function_definition_parameters(query_parameters))
         yaml_lines.append(f"parameters: {params}")
-    
+
     # Format the query body to maintain proper indentation
     yaml_lines.append("body: |-")
-    for line in get_parameter_initializers(query_parameters) + query_text.strip().split('\n'):
+    for line in custom_function_parameter_initializers(query_parameters) + query_text.strip().split('\n'):
         yaml_lines.append(f"  {line}")
-    
+
     return '\n'.join(yaml_lines)
 
 def camel_to_snake(name):
     # Handle acronyms like HTTP, CSV, API, etc. by converting them to Http, Csv, Api
     acronym_pattern = re.compile(r'([A-Z])([A-Z]+)')
     name = acronym_pattern.sub(lambda m: m.group(1) + m.group(2).lower(), name)
-    
+
     # Remove existing underscores if they exist
     name = name.replace('_', '')
 
@@ -502,7 +489,7 @@ def extract(
 ) -> None:
     """
     Extract Kusto queries from Azure Data Explorer dashboard export file.
-    
+
     Args:
         dashboard_file_path: Path to the dashboard JSON file
         output_folder: Folder to save extracted queries in
@@ -528,7 +515,7 @@ def extract(
     queries_by_id = {}
     datasources_by_id = {}
     parameters_by_name = {}
-    
+
     for base_query in dashboard.get('baseQueries', []):
         base_queries_by_id[base_query['id']] = base_query
         base_queries_by_query_id[base_query['queryId']] = base_query
@@ -536,14 +523,14 @@ def extract(
 
     for query in dashboard.get('queries', []):
         queries_by_id[query['id']] = query
-    
+
     for datasource in dashboard.get('dataSources', []):
         datasources_by_id[datasource['id']] = datasource
-    
+
     for param in dashboard.get('parameters', []):
         if 'variableName' in param:
             parameters_by_name[param['variableName']] = param
-        
+
     # Generate new names for base queries
     output_function_names = {}
     for bq_name, _ in base_queries_by_name.items():
@@ -555,7 +542,7 @@ def extract(
     function_names_by_database = dict[str, List[str]]()
     if cluster_databases_folder:
         for root, _, files in os.walk(cluster_databases_folder):
-            if os.path.basename(root) != "functions": 
+            if os.path.basename(root) != "functions":
                 continue
             database_name = os.path.basename(os.path.dirname(root))
             database_functions = function_names_by_database.setdefault(database_name, [])
@@ -566,10 +553,10 @@ def extract(
 
     # Keep track of what we've processed
     processed_count = 0
-    
+
     # Container for all function definitions if functions_single_file is enabled
     # As a single file, this only works with sufficient permissions, but that's logically what we're doing here.
-    all_function_texts = [".execute database script <|"]
+    all_function_texts = []
 
     # Extract each base query
     for base_query_id, base_query in base_queries_by_id.items():
@@ -606,7 +593,7 @@ def extract(
 
             # Replace variable with function call using snake_case name
             sig = function_call_signature(
-                function_name=output_function_names.get(referenced_base_query_name, referenced_base_query_name), 
+                function_name=output_function_names.get(referenced_base_query_name, referenced_base_query_name),
                 parameters=parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, referenced_bq_query_id)
                 )
             fully_qualified_name = f"database('{output_database_name}').{sig}"
@@ -616,7 +603,7 @@ def extract(
         query_parameters = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, query_id)
         query_text_modified = replace_initialized_parameters(query_text_modified, query_parameters)
 
-        # Reference schemas explicitly 
+        # Reference schemas explicitly
         if function_names_by_database:
             # load the functions in the original database for this query
             functions = function_names_by_database.get(database_name)
@@ -644,21 +631,23 @@ def extract(
                 docstring=docstring,
                 function_folder=output_function_folder
             )
-            
+
             if create_functions:
                 save(os.path.join(output_folder, f"create_{function_name}.kql"), final_text)
-            
+
             if create_functions_single_file:
                 all_function_texts.append(final_text)
+
         if create_yaml:
+            file_name = f"{function_name}.yml"
             final_text = generate_yaml_function(
-                function_name=function_name,
+                file_name=file_name,
                 query_text=query_text_modified,
                 query_parameters=query_parameters,
                 docstring=docstring,
                 function_folder=output_function_folder
             )
-            save(os.path.join(output_folder, f"{function_name}.yml"), final_text)
+            save(os.path.join(output_folder, file_name), final_text)
 
         if create_queries:
             final_text = generate_kusto_query(
@@ -669,38 +658,42 @@ def extract(
             save(os.path.join(output_folder, f"{function_name}.kusto"), final_text)
 
         processed_count += 1
-        
+
     # Save all functions in a single file if requested
     if create_functions_single_file and all_function_texts:
-        combined_text = '\n'.join(all_function_texts)
-        save(os.path.join(output_folder, f"{output_function_folder}_all_functions.kql"), combined_text)
-        
+        # this execute script doesn't work unless you have admin permissions on the cluster
+        # all_function_texts.append(".execute database script <|")
+        combined_text = '\n\n'.join(all_function_texts)
+        all_function_texts_file_path = os.path.join(output_folder, f"{output_function_folder}_all_functions.kql")
+        save(all_function_texts_file_path, combined_text)
+        print(f"Created database update file '{all_function_texts_file_path}'")
+
     # Create a new dashboard with function references instead of base queries
-    if create_new_dashboard:   
+    if create_new_dashboard:
         # Create a deep copy of the dashboard to modify
         extracted_dashboard = json.loads(json.dumps(dashboard))
-        
+
         # First, identify all queries that are referenced by base queries
         base_query_ids = set()
         for bq in dashboard.get('baseQueries', []):
             if 'queryId' in bq:
                 base_query_ids.add(bq['queryId'])
-        
+
         # Map of queries to remove later
         query_indices_to_remove = []
-        
+
         # For all queries in the dashboard
         for i, query in enumerate(extracted_dashboard.get('queries', [])):
             # If this query is only used by a base query, mark it for removal
             if query.get('id') in base_query_ids:
-                # this is a base query, we will no longer need it. 
+                # this is a base query, we will no longer need it.
                 # store index for quick removal
                 query_indices_to_remove.append(i)
                 continue
-                
+
             query_text = query.get('text', '')
             used_variables = query.get('usedVariables', [])
-            
+
             # Replace base query references with function calls
             for var_name in used_variables[:]:  # Use a copy to safely modify during iteration
                 if var_name in base_queries_by_name:
@@ -709,18 +702,18 @@ def extract(
                     bq_query_id = bq.get('queryId')
                     if not bq_query_id:
                         continue
-                    
+
                     # Load replacement function name
                     function_name = output_function_names.get(var_name, var_name)
-                    
+
                     # Build function call signature
                     params = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, bq_query_id)
                     sig = function_call_signature(function_name, params)
                     qualified_function_call = f"database('{output_database_name}').{sig}"
-                    
+
                     # Replace variable reference with function call in query text
                     query_text = query_text.replace(var_name, qualified_function_call)
-                    
+
                     # Remove this base query from usedVariables
                     used_variables.remove(var_name)
 
@@ -728,19 +721,19 @@ def extract(
                     for param in params:
                         if param.name not in used_variables:
                             used_variables.append(param.name)
-            
+
             # Update the query with modified text and variables
             query['text'] = query_text
             query['usedVariables'] = used_variables
-        
+
         # Remove queries that were only used by base queries (in reverse order to avoid index issues)
         for i in reversed(query_indices_to_remove):
             del extracted_dashboard['queries'][i]
-        
+
         # Remove baseQueries section from the dashboard
         if 'baseQueries' in extracted_dashboard:
             extracted_dashboard['baseQueries'] = []
-        
+
         # Save the modified dashboard
         base_name, ext = os.path.splitext(dashboard_file_path)
         extracted_dashboard_output = f"{base_name}-extracted{ext}"
@@ -767,7 +760,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     extract(
-        args.dashboard_file, 
+        args.dashboard_file,
         args.output,
         args.output_database,
         args.output_function_folder,
