@@ -77,61 +77,45 @@ class Parameter(object):
         self.default_value = default_value
         self.initializer = initializer
         self.initialized_name = initialized_name
-    
-    def default_value_initializer(self):
-        """
-        Format the default value for use in KQL or YAML.
-        Ensures string values are properly quoted only when needed.
-        
-        Returns:
-            - For non-scalar types: always returns dynamic(null)
-            - For string scalar types: returns quoted string if not already quoted
-            - For other scalar types: returns the value as is
-        """
-        if self.selection_type != 'scalar':
-            return "dynamic(null)"
-            
-        value = self.default_value
-        
-        # Only quote string values if they're scalar and not already quoted
-        if self.kind == 'string' and value and not (value.startswith('"') and value.endswith('"')):
-            return f'"{value}"'
-        
-        return value
 
     @property
     def default_value(self) -> str:
         if self._default_value:
             return self._default_value
 
-        if self.selection_type != 'scalar':
-            return "dynamic(null)" # return dynamic(null) for any list
-        
-        self._default_value = Parameter.KUSTO_DEFAULT_VALUES.get(self.kind, 'dynamic(null)')
+        if self.selection_type == 'scalar':
+            self._default_value = Parameter.KUSTO_DEFAULT_VALUES.get(self.kind, 'dynamic(null)')
+        else:
+            self._default_value = "dynamic(null)"  # For lists, we use dynamic(null)
         return self._default_value
 
     @default_value.setter
     def default_value(self, value: str):
-        self._default_value = value
-  
-    def kind_with_selection(self) -> str:
+        if self.kind == 'string' and value and not (value.startswith('"') and value.endswith('"')):
+            self._default_value = f'"{value}"' # ensure quoted strings
+        else:
+            self._default_value = value
+
+    def data_type(self) -> str:
         if self.selection_type == 'scalar':
             return self.kind
         return 'dynamic'  # For lists, we use dynamic type
 
     @property
+    def requires_custom_initializer(self) -> bool:
+        return self.name != self.initialized_name
+
+    @property
     def initializer(self) -> str:
         """
-        Returns a Kusto initializer for this parameter.
-        This is used in the function body to set default values.
+        Returns code to initialize a parameter in the body of a query.
         """
         if self._initializer:
             return self._initializer
         
-        # build a default initializer
+        # there was no custom code, so build a default initializer
         if self.selection_type == 'scalar':
-            value = self.default_value_initializer()
-            i = f"let {self.name} = {value};"
+            i = f"let {self.name} = {self.default_value};"
         else:
             i = f"let {self.name} = dynamic({self.default_value});"
 
@@ -140,13 +124,15 @@ class Parameter(object):
     
     @initializer.setter
     def initializer(self, value: str):
+        # use this if you have custom code to initalize this parameter.
+        # eg: let initialized_name = coalesce(foo(), bar(), baz());
         self._initializer = value
+
 
     @property
     def initialized_name(self) -> str:
-        if self._initialized_name:
-            return self._initialized_name
-        return ""
+        return self._initialized_name
+        
     @initialized_name.setter
     def initialized_name(self, value: str):
         self._initialized_name = value
@@ -182,14 +168,14 @@ def parameters_for_query(
     Returns:
         List of tuples (parameter_name, parameter_type, selection_type)
     """
-    def get_referenced_parameters(
+    def load_parameter_names(
         base_queries_by_name, 
         queries_by_id, 
         query_id, 
         in_progress=None
         ) -> Set[str]:
         """
-        Recursively find all parameters used by a query, accounting for dependencies on other queries.
+        Recursively find all parameter names used by a query, accounting for dependencies on other queries.
         
         Args:
             base_queries_by_name: Dictionary mapping variable names to base queries
@@ -225,13 +211,13 @@ def parameters_for_query(
             in_progress.remove(query_id)  # Remove from in-progress set before returning
             return set()
         
-        parameters = set()
+        parameter_names = set()
         text = query.get('text', '')
         
         # Check for _startTime and _endTime in used variables in query text
         for p in ('_startTime', '_endTime'):
             if p in text:
-                parameters.add(p)
+                parameter_names.add(p)
         
         # Process each used variable
         for var in query.get('usedVariables', []):
@@ -240,7 +226,7 @@ def parameters_for_query(
                 bq_query_id = bq.get('queryId')
                 if not bq_query_id:
                     continue
-                parameters.update(get_referenced_parameters(
+                parameter_names.update(load_parameter_names(
                     base_queries_by_name, 
                     queries_by_id, 
                     bq_query_id, 
@@ -248,33 +234,39 @@ def parameters_for_query(
                 ))
             else:
                 # Otherwise, it's a parameter
-                parameters.add(var)
+                parameter_names.add(var)
 
         # Cache results for future calls
-        QUERY_PARAMETERS[query_id] = parameters
+        QUERY_PARAMETERS[query_id] = parameter_names
         
         # Remove from in-progress set now that we're done with this branch
         in_progress.remove(query_id)
-        
-        return parameters
+
+        return parameter_names
 
     result= []
-    names = get_referenced_parameters(base_queries_by_name, queries_by_id, query_id)
+    names = load_parameter_names(base_queries_by_name, queries_by_id, query_id)
+
+    # Add reserved parameters first if they are used
     for p, (initialized_name, initializer) in RESERVED_PARAMETERS.items():
         if p in names:
-            param = Parameter(p, 'datetime', "scalar", 
-                        initializer=initializer, 
-                        initialized_name=initialized_name)
+            param = Parameter(name=p, 
+                              kind='datetime', 
+                              selection_type="scalar", 
+                              default_value=None, 
+                              initialized_name=initialized_name, 
+                              initializer=initializer)
             result.append(param)
 
     # Collect other parameters, force stable order
     for p in sorted(names):
         if p in RESERVED_PARAMETERS.keys():
             continue
+        parameter_metadata = parameters_by_name[p]
         param = Parameter(p, 
-            kind=parameters_by_name[p]["kind"].lower(), 
-            selection_type=parameters_by_name[p]["selectionType"].lower(),
-            default_value=parameters_by_name[p].get("defaultValue", {}).get('value', ''),
+            kind=parameter_metadata["kind"].lower(), 
+            selection_type=parameter_metadata["selectionType"].lower(),
+            default_value=parameter_metadata.get("defaultValue", {}).get('value', ''),
             )
         result.append(param)
     return result
@@ -287,24 +279,20 @@ def function_call_signature(
 
 def function_definition_parameters(
     parameters: list[Parameter]
-) -> list[str]:
-    result = []
-    for p in parameters:
-        value = p.default_value_initializer()
-        result.append(f"{p.name}:{p.kind_with_selection()}={value}")
-    return result
+) -> list[str]: 
+    return [f"{p.name}:{p.data_type()}={p.default_value}" for p in parameters]
 
-def get_parameter_initializers(
+def custom_function_parameter_initializers(
     query_parameters: list[Parameter]
 ) -> list[str]:
-    return [p.initializer for p in query_parameters if p.initialized_name]
+    return [p.initializer for p in query_parameters if p.requires_custom_initializer]
 
 def replace_initialized_parameters(
         query_text: str, 
         parameters: list[Parameter]
         ) -> str:
     for p in parameters:
-        if p.initialized_name:
+        if p.requires_custom_initializer:
             query_text = query_text.replace(p.name, p.initialized_name)
     return query_text
 
@@ -403,16 +391,19 @@ def generate_kusto_function(
     
     # build signature
     function_parameters = ""
-    parameter_initializers = []
     if query_parameters:
         params = function_definition_parameters(query_parameters)
         function_parameters += f"\n{4*' '}" + f',\n{4 * " "}'.join(params) + "\n"
-        parameter_initializers = get_parameter_initializers(query_parameters)
-
+        
     # build function body
     lines.append(f"{function_name}({function_parameters}){{")
-    if parameter_initializers:
-        lines.append("\n".join(parameter_initializers))
+
+    if query_parameters:
+        # add custom initiatlizers if needed
+        initializers = custom_function_parameter_initializers(query_parameters)
+        if initializers:
+            lines.append("\n".join(initializers))
+
     lines.append(query_text)
     lines.append(f"}}")
 
@@ -461,7 +452,7 @@ def generate_yaml_function(
     
     # Format the query body to maintain proper indentation
     yaml_lines.append("body: |-")
-    for line in get_parameter_initializers(query_parameters) + query_text.strip().split('\n'):
+    for line in custom_function_parameter_initializers(query_parameters) + query_text.strip().split('\n'):
         yaml_lines.append(f"  {line}")
     
     return '\n'.join(yaml_lines)
