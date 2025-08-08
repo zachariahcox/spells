@@ -51,6 +51,10 @@ import re
 from typing import Dict, Set, List
 
 class Parameter(object):
+    RESERVED = {
+        '_startTime': ('_startTimeInitialized', "coalesce(_startTime, startofday(ago(7d)))"),
+        '_endTime': ('_endTimeInitialized', "coalesce(_endTime, endofday(now()))"),
+    }
     KUSTO_DEFAULT_VALUES = {
         'string': '""',               # Empty string
         'long': 'long(0)',            # Integer zero
@@ -67,16 +71,12 @@ class Parameter(object):
         name: str,
         kind: str,
         selection_type: str,
-        default_value: str = "",
-        initializer: str = "",
-        initialized_name: str = ""
+        default_value: str = ""
         ):
         self.name = name
         self.kind = kind
         self.selection_type = selection_type
         self.default_value = default_value
-        self.initializer = initializer
-        self.initialized_name = initialized_name
 
     @property
     def default_value(self) -> str:
@@ -96,22 +96,47 @@ class Parameter(object):
         else:
             self._default_value = value
 
+    @property
     def data_type(self) -> str:
-        if self.selection_type == 'scalar':
-            return self.kind
-        return 'dynamic'  # For lists, we use dynamic type
+        return self.kind if self.selection_type == 'scalar' else 'dynamic'
+
+    @property
+    def function_name(self) -> str:
+        # if parameter name has a leading "_" remove it
+        if self.name and self.name[0] == "_":
+            return self.name[1:]
+        return self.name
 
     @property
     def requires_custom_initializer(self) -> bool:
-        return self.name != self.initialized_name
+        return self.name in Parameter.RESERVED
 
     @property
-    def initializer(self) -> str:
+    def function_initializer(self) -> str:
+        if self.function_name == self.name:
+            return ""
+
+        # if we have a reserved parameter, we need to use the custom initializer
+        if self.name in Parameter.RESERVED:
+            return f"let {self.initialized_name} = {Parameter.RESERVED[self.name][1].replace(self.name, self.function_name)};"
+
+        # because we renamed the parameter, we need to map it back here.
+        return f"let {self.name} = {self.function_name};"
+
+    @property
+    def initialized_name(self) -> str:
+        if self.name in Parameter.RESERVED:
+            return Parameter.RESERVED[self.name][0]  # Using direct dictionary access
+        return self.name
+
+    @property
+    def custom_initializer(self) -> str:
         """
         Returns code to initialize a parameter in the body of a query.
         """
-        if self._initializer:
-            return self._initializer
+        # return custom initializer for ranges
+        if self.name in Parameter.RESERVED:
+            return f"let {self.initialized_name} = {Parameter.RESERVED[self.name][1]};"
 
         # there was no custom code, so build a default initializer
         if self.selection_type == 'scalar':
@@ -119,31 +144,11 @@ class Parameter(object):
         else:
             i = f"let {self.name} = dynamic({self.default_value});"
 
-        self._initializer = i
+        self._custom_initializer = i
         return i
-
-    @initializer.setter
-    def initializer(self, value: str):
-        # use this if you have custom code to initalize this parameter.
-        # eg: let initialized_name = coalesce(foo(), bar(), baz());
-        self._initializer = value
-
-
-    @property
-    def initialized_name(self) -> str:
-        return self._initialized_name
-
-    @initialized_name.setter
-    def initialized_name(self, value: str):
-        self._initialized_name = value
 
 # Cache for used parameters to avoid redundant calculations
 QUERY_PARAMETERS: Dict[str, Set[str]] = {}
-
-RESERVED_PARAMETERS = {
-    '_startTime': ('_startTimeInitialized', "let _startTimeInitialized = coalesce(_startTime, startofday(ago(7d)));"),
-    '_endTime': ('_endTimeInitialized', "let _endTimeInitialized = coalesce(_endTime, endofday(now()));"),
-}
 
 def parameters_for_query(
     base_queries_by_name,
@@ -248,19 +253,17 @@ def parameters_for_query(
     names = load_parameter_names(base_queries_by_name, queries_by_id, query_id)
 
     # Add reserved parameters first if they are used
-    for p, (initialized_name, initializer) in RESERVED_PARAMETERS.items():
+    for p, (name, custom_code) in Parameter.RESERVED.items():
         if p in names:
             param = Parameter(name=p,
                               kind='datetime',
                               selection_type="scalar",
-                              default_value=None,
-                              initialized_name=initialized_name,
-                              initializer=initializer)
+                              default_value="")
             result.append(param)
 
     # Collect other parameters, force stable order
     for p in sorted(names):
-        if p in RESERVED_PARAMETERS.keys():
+        if p in Parameter.RESERVED.keys():
             continue
         parameter_metadata = parameters_by_name[p]
         param = Parameter(p,
@@ -271,21 +274,14 @@ def parameters_for_query(
         result.append(param)
     return result
 
-def function_call_signature(
-    function_name: str,
-    parameters: list[Parameter]
-) -> str:
+def function_call_signature(function_name: str, parameters: list[Parameter]) -> str:
     return f"{function_name}({', '.join(param.name for param in parameters)})"
 
-def function_definition_parameters(
-    parameters: list[Parameter]
-) -> list[str]:
-    return [f"{p.name}:{p.data_type()}={p.default_value}" for p in parameters]
+def function_definition_parameters(parameters: list[Parameter]) -> list[str]:
+    return [f"{p.function_name}:{p.data_type}={p.default_value}" for p in parameters]
 
-def custom_function_parameter_initializers(
-    query_parameters: list[Parameter]
-) -> list[str]:
-    return [p.initializer for p in query_parameters if p.requires_custom_initializer]
+def custom_function_parameter_initializers(parameters: list[Parameter]) -> list[str]:
+    return [p.function_initializer for p in parameters]
 
 def replace_initialized_parameters(
         query_text: str,
@@ -334,7 +330,7 @@ def update_schema_references(
                 rev_line = lines[rev_line_number]
                 rev_index = index # use this index initially
                 while not decision and rev_line_number >= 0:
-                    for i in range(rev_index - 1, - 1, -1):
+                    for i in range(rev_index - 1, -1, -1):
                         c = rev_line[i]
                         if c.isspace():
                             continue
@@ -421,7 +417,7 @@ def generate_kusto_query(
     if query_parameters:
         # Create let statements for parameters
         query_lines.append(f"// Parameters -- begin")
-        query_lines.extend([p.initializer for p in query_parameters])
+        query_lines.extend([p.custom_initializer for p in query_parameters])
         query_lines.append(f"// Parameters -- end")
         query_lines.append("//")  # Empty line for separation
 
@@ -431,7 +427,7 @@ def generate_kusto_query(
     return '\n'.join(query_lines)
 
 def generate_yaml_function(
-    function_name: str,
+    file_name: str,
     query_text: str,
     query_parameters: list[Parameter],
     docstring: str,
@@ -440,7 +436,7 @@ def generate_yaml_function(
     # Build the YAML document
     yaml_lines = [
         f"folder: {function_folder}",
-        f"docString: {docstring}",
+        f"docString: {os.path.basename(__file__)}/{file_name}",
         f"preformatted: true", # should be preformatted to work with KustoSchemaTools https://github.com/github/KustoSchemaTools
     ]
 
@@ -560,7 +556,7 @@ def extract(
 
     # Container for all function definitions if functions_single_file is enabled
     # As a single file, this only works with sufficient permissions, but that's logically what we're doing here.
-    all_function_texts = [".execute database script <|"]
+    all_function_texts = []
 
     # Extract each base query
     for base_query_id, base_query in base_queries_by_id.items():
@@ -641,15 +637,17 @@ def extract(
 
             if create_functions_single_file:
                 all_function_texts.append(final_text)
+
         if create_yaml:
+            file_name = f"{function_name}.yml"
             final_text = generate_yaml_function(
-                function_name=function_name,
+                file_name=file_name,
                 query_text=query_text_modified,
                 query_parameters=query_parameters,
                 docstring=docstring,
                 function_folder=output_function_folder
             )
-            save(os.path.join(output_folder, f"{function_name}.yml"), final_text)
+            save(os.path.join(output_folder, file_name), final_text)
 
         if create_queries:
             final_text = generate_kusto_query(
@@ -663,8 +661,12 @@ def extract(
 
     # Save all functions in a single file if requested
     if create_functions_single_file and all_function_texts:
-        combined_text = '\n'.join(all_function_texts)
-        save(os.path.join(output_folder, f"{output_function_folder}_all_functions.kql"), combined_text)
+        # this execute script doesn't work unless you have admin permissions on the cluster
+        # all_function_texts.append(".execute database script <|")
+        combined_text = '\n\n'.join(all_function_texts)
+        all_function_texts_file_path = os.path.join(output_folder, f"{output_function_folder}_all_functions.kql")
+        save(all_function_texts_file_path, combined_text)
+        print(f"Created database update file '{all_function_texts_file_path}'")
 
     # Create a new dashboard with function references instead of base queries
     if create_new_dashboard:
