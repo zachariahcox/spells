@@ -427,7 +427,6 @@ def generate_kusto_query(
     return '\n'.join(query_lines)
 
 def generate_yaml_function(
-    file_name: str,
     query_text: str,
     query_parameters: list[Parameter],
     docstring: str,
@@ -436,7 +435,7 @@ def generate_yaml_function(
     # Build the YAML document
     yaml_lines = [
         f"folder: {function_folder}",
-        f"docString: {os.path.basename(__file__)}/{file_name}",
+        f"docString: {docstring}",
         f"preformatted: true", # should be preformatted to work with KustoSchemaTools https://github.com/github/KustoSchemaTools
     ]
 
@@ -485,7 +484,8 @@ def extract(
     create_queries: bool = False,
     create_functions_single_file: bool = False,
     create_new_dashboard: bool = False,
-    cluster_databases_folder: str = str()
+    cluster_databases_folder: str = str(),
+    docstring_prefix: str = str()
 ) -> None:
     """
     Extract Kusto queries from Azure Data Explorer dashboard export file.
@@ -597,7 +597,10 @@ def extract(
                 parameters=parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, referenced_bq_query_id)
                 )
             fully_qualified_name = f"database('{output_database_name}').{sig}"
-            query_text_modified = query_text_modified.replace(referenced_base_query_name, fully_qualified_name)
+
+            # Use regex to ensure we only replace complete tokens, not substrings
+            pattern = r'(?<!\w)' + re.escape(referenced_base_query_name) + r'(?!\w)'
+            query_text_modified = re.sub(pattern, fully_qualified_name, query_text_modified)
 
         # Deal with parameters
         query_parameters = parameters_for_query(base_queries_by_name, parameters_by_name, queries_by_id, query_id)
@@ -616,7 +619,7 @@ def extract(
         # Generate docstring and function name
         bq_name = base_query.get('variableName', f'unknown_{base_query_id}')
         function_name = output_function_names.get(bq_name, bq_name)
-        docstring=f"{bq_name} exported from dashboard {dashboard_title} using extract_base_queries.py"
+        docstring = f"{docstring_prefix}{function_name}"
 
         # Generate the output contents
         # Create output folder if it doesn't exist
@@ -639,15 +642,13 @@ def extract(
                 all_function_texts.append(final_text)
 
         if create_yaml:
-            file_name = f"{function_name}.yml"
             final_text = generate_yaml_function(
-                file_name=file_name,
                 query_text=query_text_modified,
                 query_parameters=query_parameters,
-                docstring=docstring,
+                docstring=docstring + ".yml",
                 function_folder=output_function_folder
             )
-            save(os.path.join(output_folder, file_name), final_text)
+            save(os.path.join(output_folder, f"{function_name}.yml"), final_text)
 
         if create_queries:
             final_text = generate_kusto_query(
@@ -712,7 +713,9 @@ def extract(
                     qualified_function_call = f"database('{output_database_name}').{sig}"
 
                     # Replace variable reference with function call in query text
-                    query_text = query_text.replace(var_name, qualified_function_call)
+                    # Use regex to ensure we only replace complete tokens, not substrings
+                    pattern = r'(?<!\w)' + re.escape(var_name) + r'(?!\w)'
+                    query_text = re.sub(pattern, qualified_function_call, query_text)
 
                     # Remove this base query from usedVariables
                     used_variables.remove(var_name)
@@ -757,6 +760,7 @@ if __name__ == '__main__':
     parser.add_argument("--functions_single_file", "-fsf", action="store_true", help="Emit a single file with all create-or-alter function definitions concatenated")
     parser.add_argument("--cluster_databases_folder", "-cs", help="Directory containing definition files for all databases in the cluster")
     parser.add_argument("--create_new_dashboard", "-nd", help="Whether to create a new dashboard JSON file with base queries replaced by calls to extracted functions", action="store_true")
+    parser.add_argument("--docstring_prefix", "-dp", default=f"Extracted by {os.path.basename(__file__)}", help="docstring will be {your_prefix}{function_name}")
     args = parser.parse_args()
 
     extract(
@@ -769,5 +773,6 @@ if __name__ == '__main__':
         create_queries=args.queries,
         create_functions_single_file=args.functions_single_file,
         create_new_dashboard=args.create_new_dashboard,
-        cluster_databases_folder=args.cluster_databases_folder
+        cluster_databases_folder=args.cluster_databases_folder,
+        docstring_prefix=args.docstring_prefix
     )
