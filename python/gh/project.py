@@ -3,9 +3,9 @@ The script produces lists of GitHub issues referenced by GitHub projects.
 The projects API has key limitations on query lengths.
 Many operations require multiple queries and offline processing.
 
-You'll need to have the GitHub CLI installed and authenticated with the `project` scope.
+You will need to have the GitHub CLI installed and authenticated with the project scope.
 Usage:
-    python project.py <project_url> [--field NAME VALUE] [--output FORMAT] [--verbose] [--quiet] [--subissues] [--title]
+    python project.py <project_url> [--field NAME VALUE] [--label LABEL_EXPR] [--output FORMAT] [--verbose] [--quiet] [--subissues] [--title]
 """
 import subprocess
 import json
@@ -14,7 +14,7 @@ import shutil
 import sys
 import argparse
 import logging
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Set
 
 # Setup logger
 logger = logging.getLogger(__name__)
@@ -24,6 +24,53 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 handler.setLevel(logging.DEBUG)
+
+def parse_label_expression(label_expr: str) -> List[str]:
+    """
+    Parse a label expression string into a list of label names.
+    Handles quoted labels (both single and double quotes) with spaces.
+
+    Args:
+        label_expr: A string like "label:a,'b with space',\"another label\""
+
+    Returns:
+        A list of label names, e.g. ["a", "b with space", "another label"]
+    """
+    if not label_expr:
+        return []
+
+    result = []
+    current = ""
+    in_single_quotes = False
+    in_double_quotes = False
+
+    for char in label_expr:
+        if char == ',' and not in_single_quotes and not in_double_quotes:
+            # End of an item
+            if current:
+                result.append(current.strip())
+                current = ""
+        elif char == "'" and not in_double_quotes:
+            # Toggle single quote mode
+            in_single_quotes = not in_single_quotes
+            if not in_single_quotes:  # If we're closing quotes
+                result.append(current.strip())
+                current = ""
+        elif char == '"' and not in_single_quotes:
+            # Toggle double quote mode
+            in_double_quotes = not in_double_quotes
+            if not in_double_quotes:  # If we're closing quotes
+                result.append(current.strip())
+                current = ""
+        elif (in_single_quotes or in_double_quotes) or (char not in ['"', "'"]):
+            # Add character to current item
+            current += char
+
+    # Add the last item if there is one
+    if current:
+        result.append(current.strip())
+
+    return result
 
 def log_json(data, message=None):
     """Helper function to log JSON data during debugging"""
@@ -37,18 +84,18 @@ def log_json(data, message=None):
             logger.debug(str(data))
 
 def create_project_query_template(
-    entity_type: str, 
-    entity_identifier: str, 
+    entity_type: str,
+    entity_identifier: str,
     project_number: str
 ) -> str:
     """
     Create a GraphQL query template for a GitHub project.
-    
+
     Args:
         entity_type: The type of entity (organization, user, or repository)
         entity_identifier: The identifier(s) for the entity - org name, user login, or owner/repo pair
         project_number: The project number
-        
+
     Returns:
         A formatted GraphQL query string
     """
@@ -59,7 +106,7 @@ def create_project_query_template(
         entity_params = f'(owner: "{owner}", name: "{repo}")'
     elif entity_type == "organization" or entity_type == "user":
         entity_params = f'(login: "{entity_identifier}")'
-    
+
     # Build the GraphQL query using the appropriate entity type
     return f"""
     query {{
@@ -134,16 +181,18 @@ def create_project_query_template(
     """
 
 def get_issues(
-    project_url: str, 
+    project_url: str,
     field_values: dict[str, str] | None = None,
-    negative_field_values: List[Tuple[str, str]] | None = None
+    negative_field_values: List[Tuple[str, str]] | None = None,
+    label_filters: Set[str] | None = None
 ) -> list[Dict[str, str]]:
     """Search for GitHub issues using a query string and filter to only issues in the specified project.
-    
+
     Args:
         project_url: The URL of the GitHub project to filter issues by. Project can contain issues from multiple repos.
         field_values: Optional dictionary of project field values to filter by {field_name: field_value}
         negative_field_values: Optional list of tuples for project field values to exclude [(field_name, field_value)]
+        label_filters: Optional set of label names to filter issues by (OR condition between labels)
     Returns:
         List of GitHub issue URLs belonging to the specified project
     """
@@ -152,35 +201,35 @@ def get_issues(
         # When no project URL is provided, raise an error
         logger.error("Project URL must be provided to filter issues by project")
         raise ValueError("Project URL must be provided to filter issues by project")
-    
+
     check_gh_auth_scopes()
 
-    try:    
+    try:
         # Extract project owner, repo, and number from the URL
         # Format could be:
         # - https://github.com/orgs/{org}/projects/{number}
         # - https://github.com/users/{user}/projects/{number}
         # - https://github.com/{owner}/{repo}/projects/{number}
-        
+
         org_match = re.search(r'github\.com/orgs/([^/]+)/projects/(\d+)', project_url)
         user_match = re.search(r'github\.com/users/([^/]+)/projects/(\d+)', project_url)
         repo_match = re.search(r'github\.com/([^/]+)/([^/]+)/projects/(\d+)', project_url)
-        
+
         # Construct GraphQL query based on the project URL type
         graphql_query = ""
-        
+
         if org_match:
             org = org_match.group(1)
             project_number = org_match.group(2)
             logger.debug(f"Fetching issues from organization project: {org}/projects/{project_number}")
-            
+
             # GraphQL query for organization project
             graphql_query = create_project_query_template("organization", org, project_number)
         elif user_match:
             user = user_match.group(1)
             project_number = user_match.group(2)
             logger.debug(f"Fetching issues from user project: {user}/projects/{project_number}")
-            
+
             # GraphQL query for user project
             graphql_query = create_project_query_template("user", user, project_number)
         elif repo_match:
@@ -188,13 +237,13 @@ def get_issues(
             repo = repo_match.group(2)
             project_number = repo_match.group(3)
             logger.debug(f"Fetching issues from repository project: {owner}/{repo}/projects/{project_number}")
-            
+
             # GraphQL query for repository project
             graphql_query = create_project_query_template("repository", f"{owner}/{repo}", project_number)
         else:
             logger.error(f"Unrecognized project URL format: {project_url}")
             return []
-        
+
         # Run the GraphQL query using GitHub CLI with pagination
         all_data = {"data": {}}
         has_next_page = True
@@ -208,25 +257,25 @@ def get_issues(
             node_name = "user"
         elif repo_match:
             node_name = "repository"
-        
+
         while has_next_page:
             # Add pagination parameters
             paginated_query = graphql_query
             if end_cursor:
                 # Replace the items first argument to include the after cursor
                 paginated_query = paginated_query.replace(
-                    'items(first: 100)', 
+                    'items(first: 100)',
                     f'items(first: 100, after: "{end_cursor}")'
                 )
-            
+
             cmd = [
                 "gh", "api", "graphql",
                 "-f", f"query={paginated_query}"
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             page_data = json.loads(result.stdout)
-            
+
             # For the first page, initialize the data structure
             if not all_data["data"]:
                 all_data["data"] = page_data["data"]
@@ -238,45 +287,47 @@ def get_issues(
                 nodes = page_data
                 for key in source_path:
                     nodes = nodes.get(key, {})
-                
+
                 # Append the nodes to the accumulated data
                 if isinstance(nodes, list):
                     target_path.extend(nodes)
-            
+
             # Check if there are more pages
             page_info = page_data.get("data", {}).get(node_name, {}).get("projectV2", {}).get("items", {}).get("pageInfo", {})
             has_next_page = page_info.get("hasNextPage", False)
             end_cursor = page_info.get("endCursor")
-            
+
             if has_next_page:
                 logger.debug(f"Fetching next page of items with cursor: {end_cursor}")
-        
+
         # Use the accumulated data for further processing
         data = all_data
 
         # Get project fields structure
         project_data = data.get("data", {}).get(node_name, {}).get("projectV2", {})
-        
+
         # Build lookup dictionary for fields by name
         fields = project_data.get("fields", {}).get("nodes", [])
         field_dict = {}
         for field in fields:
             if "name" in field:
                 field_dict[field["name"]] = field
-        
+
         # Extract issue URLs and other details
         issue_details = []
         items = project_data.get("items", {}).get("nodes", [])
         for item in items:
             content = item.get("content", {})
+            if content.get("__typename") != "Issue":
+                continue # we only care about issues
             item_field_values = {}
-            
+
             # Extract field values for this item
             if "fieldValues" in item and "nodes" in item["fieldValues"]:
                 for fv in item["fieldValues"]["nodes"]:
                     if "field" in fv and "name" in fv["field"]:
                         field_name = fv["field"]["name"]
-                        
+
                         # Extract the value based on field type
                         if "text" in fv:
                             item_field_values[field_name] = fv["text"]
@@ -286,8 +337,8 @@ def get_issues(
                             item_field_values[field_name] = fv["name"]
                         elif "number" in fv:
                             item_field_values[field_name] = fv["number"]
-            
-            # Apply the field filters 
+
+            # Apply the field filters
             should_skip = False
             if field_values:
                 for field_name, expected_value in field_values.items():
@@ -301,7 +352,7 @@ def get_issues(
                         break
             if should_skip:
                 continue
-                    
+
             if content:
                 # Extract label information
                 labels = []
@@ -312,7 +363,15 @@ def get_issues(
                                 "name": label_node["name"],
                                 "color": label_node.get("color", "")
                             })
-                
+
+                # Apply label filters - if any required label matches, include the item
+                # If the item is not an issue (no content or no labels), skip label filtering
+                if label_filters:
+                    label_names = {label["name"] for label in labels}
+                    # If no label matches and there are labels to filter by, skip this item
+                    if not any(label_name in label_filters for label_name in label_names):
+                        continue
+
                 # Create a detailed issue object
                 issue_details.append({
                     "url": content["url"],
@@ -322,10 +381,11 @@ def get_issues(
                     "type": content.get("__typename", "No type"),
                     "field_values": item_field_values
                 })
-        
+
         # Field values filtering already happened during extraction
-        if field_values:
-            logger.info(f"Found {len(items)} items in project, filtered to {len(issue_details)} issues matching the field value criteria")
+        logger.info(f"Found {len(items)} items in project")
+        if field_values or label_filters:
+            logger.info(f"Filtered to {len(issue_details)} issues matching the field and label criteria")
 
         return issue_details
 
@@ -335,17 +395,17 @@ def get_issues(
         if hasattr(e, 'stderr'):
             logger.error(f"stderr: {e.stderr}")
         return []
-    
+
     except json.JSONDecodeError as e:
         logger.error(f"Error parsing project data: {e}")
         return []
-    
+
 def get_sub_issues(
         parent_issue_url: str,
         parent_title: Optional[str] = None
         ) -> List[Dict]:
     """Get sub-issues using the GitHub Sub-issues API via gh CLI.
-    
+
     Args:
         issue_url: The URL of the issue to fetch sub-issues for
     """
@@ -363,11 +423,11 @@ def get_sub_issues(
         if not match:
             logger.error(f"Invalid issue URL format: {parent_issue_url}")
             return []
-        
+
         owner, repository, issue_number = match.groups()
         repo = f"{owner}/{repository}"
         api_endpoint = f"/repos/{owner}/{repository}/issues/{issue_number}/sub_issues"
-        
+
         # Use gh api command with the correct headers as specified in the GitHub API docs
         cmd = [
             "gh", "api",
@@ -375,13 +435,13 @@ def get_sub_issues(
             "-H", "X-GitHub-Api-Version: 2022-11-28",
             api_endpoint
         ]
-        
+
         logger.debug(f"Running command: {' '.join(cmd)}")
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         logger.debug(f"Command completed with exit code: {result.returncode}")
         sub_issues_data = json.loads(result.stdout)
         log_json(sub_issues_data, f"Sub-issues data for {repo}#{issue_number}:")
-        
+
         # For each sub-issue, fetch full details to get labels
         sub_issues = []
         for sub_issue in sub_issues_data:
@@ -390,9 +450,9 @@ def get_sub_issues(
             if not sub_repo and "repository_url" in sub_issue:
                 # Fallback to repository_url if available
                 sub_repo = sub_issue.get("repository_url", "").replace("https://api.github.com/repos/", "")
-            
+
             sub_issue_number = str(sub_issue.get("number", ""))
-            
+
             # Only proceed if we have valid information
             if sub_repo and sub_issue_number:
                 logger.info(f"  - Found: https://github.com/{sub_repo}/issues/{sub_issue_number}")
@@ -407,17 +467,17 @@ def get_sub_issues(
                 # detailed_sub_issue["target_date"] = target_date if target_date else "N/A"
                 # detailed_sub_issue["last_updated_at"] = comment_timestamp if comment_timestamp else "N/A"
                 # detailed_sub_issue["comment_url"] = comment_url if comment_url else "N/A"
-                
+
                 # Add parent issue information
                 detailed_sub_issue["parent_url"] = parent_issue_url
                 detailed_sub_issue["parent_title"] = parent_title if parent_title else f"{repo}#{issue_number}"
-                
+
                 sub_issues.append(detailed_sub_issue)
             else:
                 logger.warning(f"  - Incomplete sub-issue data: {sub_issue}")
-        
+
         return sub_issues
-        
+
     except subprocess.CalledProcessError as e:
         logger.error(f"Error getting sub-issues for {repo}#{issue_number}: {e}")
         if hasattr(e, 'stderr'):
@@ -429,16 +489,16 @@ def check_gh_auth_scopes() -> None:
     # Check if gh CLI is installed
     if not shutil.which("gh"):
         raise RuntimeError("GitHub CLI (gh) not found. Please install it: https://cli.github.com/")
-    
+
     # Check if user has the required project scope
     try:
         # First run gh auth status and grep for scopes to get just the scope information
         result = subprocess.run(
-            ["sh", "-c", "gh auth status | grep scopes"], 
-            capture_output=True, 
+            ["sh", "-c", "gh auth status | grep scopes"],
+            capture_output=True,
             text=True
         )
-        
+
         if "project" not in result.stdout.lower():
             logger.warning("GitHub CLI doesn't have project scope authorization.")
             logger.warning("Run 'gh auth refresh -s project' to add the required scope.")
@@ -451,17 +511,19 @@ if __name__ == "__main__":
         # Set up argument parser
         parser = argparse.ArgumentParser(description="Get GitHub issues from a project with filtering options")
         parser.add_argument("project_url", help="GitHub project URL (org, user, or repo project)")
-        parser.add_argument("--field", "-f", action="append", nargs=2, metavar=("NAME", "VALUE"), 
-                           help="Items where custom field _is_ specified value in format: 'field_name field_value'. Can be used multiple times.")
-        parser.add_argument("--fieldIsNot", "-n", action="append", nargs=2, metavar=("NAME", "VALUE"), 
-                           help="Items where custom field is _not_ specified value in format: 'field_name field_value'. Can be used multiple times.")
+        parser.add_argument("--field", "-f", action="append", nargs=2, metavar=("NAME", "VALUE"),
+                           help="Items where custom field _is_ specified value in format: 'field_name field_value'. Can be used multiple times as an AND clause.")
+        parser.add_argument("--fieldIsNot", "-n", action="append", nargs=2, metavar=("NAME", "VALUE"),
+                           help="Items where custom field is _not_ specified value in format: 'field_name field_value'. Can be used multiple times as an AND clause.")
+        parser.add_argument("--label", "-l", metavar="LABEL_EXPRESSION",
+                           help="Filter issues by label(s). Format: \"label:a,'b with space'\" means include issues with label 'a' OR 'b with space'. Both single and double quotes are supported for labels with spaces.")
         parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'csv' (🐈-separated values), 'markdown', or 'json'")
         parser.add_argument("--subissues", "-s", action="store_true", help="Include sub-issues in the output")
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
         parser.add_argument("--quiet", "-q", action="store_true", help="Suppress all non-essential output")
-        
+
         args = parser.parse_args()
-        
+
         # Configure logging based on command line options
         if args.verbose:
             logger.setLevel(logging.DEBUG)
@@ -478,15 +540,20 @@ if __name__ == "__main__":
         if args.field:
             for field_name, field_value in args.field:
                 field_values[field_name] = field_value
-        
+
         # Convert negative field arguments to a list of tuples
         negative_field_values = []
         if args.fieldIsNot:
             for field_name, field_value in args.fieldIsNot:
                 negative_field_values.append((field_name, field_value))
 
+        # Parse label expression if provided
+        label_filters = None
+        if args.label:
+            label_filters = set(parse_label_expression(args.label))
+
         # Get issues with the specified filters
-        issue_details = get_issues(args.project_url, field_values, negative_field_values)
+        issue_details = get_issues(args.project_url, field_values, negative_field_values, label_filters)
         if not issue_details:
             print("No matching issues found.")
             sys.exit(0)
@@ -509,21 +576,21 @@ if __name__ == "__main__":
             # Default output format is a list
             separator = "🐈"
             for issue in issue_details:
-                print(issue.get("title", "No title"), 
-                    issue.get("url", ""), 
+                print(issue.get("title", "No title"),
+                    issue.get("url", ""),
                     sep=separator)
             for issue in subissue_details:
                 print(issue.get('parent_title', 'No parent title'),
-                    issue.get("title", "No title"), 
-                    issue.get("url", ""), 
+                    issue.get("title", "No title"),
+                    issue.get("url", ""),
                     sep=separator)
         else:
             for issue in issue_details:
                 print(issue.get("url", ""))
             for issue in subissue_details:
                 print(issue.get("url", ""))
-                    
-        
+
+
     except KeyboardInterrupt:
         logger.error("Operation canceled by user.")
         sys.exit(1)
