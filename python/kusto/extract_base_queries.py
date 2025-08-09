@@ -469,10 +469,24 @@ def save(path, content):
     dir_path = os.path.dirname(path)
     if dir_path and not os.path.exists(dir_path):
         os.makedirs(dir_path, exist_ok=True)
-    with open(path, 'w') as f:
-        f.write(content)
-        if not content.endswith('\n'):
-            f.write('\n')  # Ensure the file ends with a newline
+
+    # Process the content line by line to trim trailing whitespace
+    # and ensure consistent LF line endings
+    processed_lines = []
+    for line in content.splitlines():
+        # Trim trailing whitespace from each line
+        processed_lines.append(line.rstrip())
+
+    # Join lines with LF line endings
+    processed_content = '\n'.join(processed_lines)
+
+    # Ensure the file ends with a newline
+    if processed_content and not processed_content.endswith('\n'):
+        processed_content += '\n'
+
+    # Use 'wb' mode with explicit LF line endings to ensure consistency across platforms
+    with open(path, 'wb') as f:
+        f.write(processed_content.encode('utf-8'))
 
 def extract(
     dashboard_file_path: str,
@@ -740,8 +754,7 @@ def extract(
         # Save the modified dashboard
         base_name, ext = os.path.splitext(dashboard_file_path)
         extracted_dashboard_output = f"{base_name}-extracted{ext}"
-        with open(extracted_dashboard_output, 'w') as f:
-            json.dump(extracted_dashboard, f, indent=2)
+        save(extracted_dashboard_output, json.dumps(extracted_dashboard, indent=2))
 
         print(f"Created updated dashboard file: {extracted_dashboard_output}")
 
