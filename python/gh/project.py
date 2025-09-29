@@ -219,7 +219,7 @@ def create_project_query_template(
             }}
             nodes {{
                 id
-                fieldValues(first: 20) {{
+                fieldValues(first: 50) {{
                     nodes {{
                         ... on ProjectV2ItemFieldTextValue {{
                             text
@@ -236,6 +236,10 @@ def create_project_query_template(
                         ... on ProjectV2ItemFieldNumberValue {{
                             number
                             field {{ ... on ProjectV2Field {{ name id }} }}
+                        }}
+                        ... on ProjectV2ItemFieldIterationValue {{
+                            title
+                            field {{ ... on ProjectV2IterationField {{ name id }} }}
                         }}
                     }}
                 }}
@@ -410,14 +414,11 @@ def get_issues(
                         field_name = fv["field"]["name"]
 
                         # Extract the value based on field type
-                        if "text" in fv:
-                            item_field_values[field_name] = fv["text"]
-                        elif "date" in fv:
-                            item_field_values[field_name] = fv["date"]
-                        elif "name" in fv:  # Single select field
-                            item_field_values[field_name] = fv["name"]
-                        elif "number" in fv:
-                            item_field_values[field_name] = fv["number"]
+                        # see https://docs.github.com/en/graphql/reference/objects#projectv2iterationfielditeration
+                        for k in ("text", "date", "name", "number", "title"):
+                            if k in fv:
+                                item_field_values[field_name] = fv[k]
+                                break
 
             # Apply the field filters
             should_skip = False
