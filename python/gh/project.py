@@ -219,7 +219,7 @@ def create_project_query_template(
             }}
             nodes {{
                 id
-                fieldValues(first: 50) {{
+                fieldValues(first: 20) {{
                     nodes {{
                         ... on ProjectV2ItemFieldTextValue {{
                             text
