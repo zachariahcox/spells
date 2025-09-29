@@ -1,7 +1,6 @@
 """
 The script produces lists of GitHub issues referenced by GitHub projects.
-The projects API has key limitations on query lengths.
-Many operations require multiple queries and offline processing.
+The projects API has limitations on query lengths, so this script relies on pagination and offline processing.
 
 You will need to have the GitHub CLI installed and authenticated with the project scope.
 Usage:
@@ -71,6 +70,87 @@ def parse_label_expression(label_expr: str) -> List[str]:
         result.append(current.strip())
 
     return result
+
+def parse_field_values(raw: str) -> List[str]:
+    """Parse a field value string that may contain multiple values.
+
+        Rules:
+            - Multiple values are separated by commas with NO spaces around the comma.
+                Examples: a,b,c  or  "In Progress","Ready for Review"
+            - Values that contain spaces should be quoted when typed in the shell. However, shells
+                like bash will concatenate adjacent quoted segments separated only by commas into a
+                single argument, stripping the inner quotes (e.g. "A B","C D" -> A B,C D). We accept
+                this form as valid (cannot reliably recover original quotes).
+            - Quotes are optional for values without spaces.
+            - Commas cannot have surrounding spaces.
+
+    Valid examples:
+        a
+        a,b,c
+        "a","b","c"
+        "In Progress","Ready for Review"
+
+    Invalid examples (raise ValueError):
+        a, b               # space after comma
+        "In Progress", "Ready"   # space after comma
+        "Unclosed value    # missing closing quote
+    """
+    if raw is None:
+        return []
+    raw = raw.strip()
+    if raw == "":
+        return []
+
+    tokens: List[str] = []
+    current: List[str] = []
+    in_quotes = False
+    quote_char = ''
+    for i, ch in enumerate(raw):
+        if ch in ('"', "'"):
+            if not in_quotes:
+                # starting a quoted token (only if current empty)
+                if current:
+                    # quote inside existing token, treat as literal char
+                    current.append(ch)
+                else:
+                    in_quotes = True
+                    quote_char = ch
+            else:
+                # closing quote if matches
+                if ch == quote_char:
+                    in_quotes = False
+                else:
+                    # different quote inside quotes, keep it
+                    current.append(ch)
+        elif ch == ',' and not in_quotes:
+            # validate no surrounding spaces outside quotes
+            prev_char = raw[i-1] if i > 0 else ''
+            next_char = raw[i+1] if i + 1 < len(raw) else ''
+            if prev_char == ' ' or next_char == ' ':
+                raise ValueError(f"Invalid spaces around comma in multi-value field: {raw}. Remove spaces before/after commas (e.g. a,b or \"In Progress\",\"Ready\").")
+            token = ''.join(current).strip()
+            if not token:
+                raise ValueError(f"Empty value detected in: {raw}")
+            # Allow spaces even if not quoted (shell may have stripped quotes)
+            tokens.append(token)
+            current = []
+        else:
+            current.append(ch)
+
+    if in_quotes:
+        raise ValueError(f"Unclosed quote in: {raw}")
+
+    if current:
+        token = ''.join(current).strip()
+        if not token:
+            raise ValueError(f"Empty value detected at end of: {raw}")
+        # Allow spaces even if not quoted
+        tokens.append(token)
+
+    # Final cleanup (outer quotes already removed by parsing logic)
+    tokens = [t.strip() for t in tokens if t.strip()]
+    logger.debug(f"Parsed field values '{raw}' -> {tokens}")
+    return tokens
 
 def log_json(data, message=None):
     """Helper function to log JSON data during debugging"""
@@ -182,7 +262,7 @@ def create_project_query_template(
 
 def get_issues(
     project_url: str,
-    field_values: dict[str, str] | None = None,
+    field_values: Dict[str, List[str]] | None = None,
     negative_field_values: List[Tuple[str, str]] | None = None,
     label_filters: Set[str] | None = None
 ) -> list[Dict[str, str]]:
@@ -190,7 +270,8 @@ def get_issues(
 
     Args:
         project_url: The URL of the GitHub project to filter issues by. Project can contain issues from multiple repos.
-        field_values: Optional dictionary of project field values to filter by {field_name: field_value}
+    field_values: Optional dictionary of project field values to filter by {field_name: [value1, value2, ...]}.
+              Each item's field value (converted to string) must match one of the provided values (OR logic per field, AND across fields).
         negative_field_values: Optional list of tuples for project field values to exclude [(field_name, field_value)]
         label_filters: Optional set of label names to filter issues by (OR condition between labels)
     Returns:
@@ -341,8 +422,10 @@ def get_issues(
             # Apply the field filters
             should_skip = False
             if field_values:
-                for field_name, expected_value in field_values.items():
-                    if field_name not in item_field_values or item_field_values[field_name] != expected_value:
+                for field_name, acceptable_values in field_values.items():
+                    actual_value = item_field_values.get(field_name)
+                    actual_value_str = str(actual_value) if actual_value is not None else None
+                    if actual_value_str not in acceptable_values:
                         should_skip = True
                         break
             if negative_field_values:
@@ -512,9 +595,9 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Get GitHub issues from a project with filtering options")
         parser.add_argument("project_url", help="GitHub project URL (org, user, or repo project)")
         parser.add_argument("--field", "-f", action="append", nargs=2, metavar=("NAME", "VALUE"),
-                           help="Items where custom field _is_ specified value in format: 'field_name field_value'. Can be used multiple times as an AND clause.")
+                           help="Filter items to where field exactly matches one of the specified values: 'field_name a,b,c'. Values follow project query rules (quoted, comma separated). Can be used multiple times as an AND clause.")
         parser.add_argument("--fieldIsNot", "-n", action="append", nargs=2, metavar=("NAME", "VALUE"),
-                           help="Items where custom field is _not_ specified value in format: 'field_name field_value'. Can be used multiple times as an AND clause.")
+                           help="Items where custom field is _not_ exactly matching specified value in format: 'key value'. Can be used multiple times as an AND clause.")
         parser.add_argument("--label", "-l", metavar="LABEL_EXPRESSION",
                            help="Filter issues by label(s). Format: \"label:a,'b with space'\" means include issues with label 'a' OR 'b with space'. Both single and double quotes are supported for labels with spaces.")
         parser.add_argument("--output", "-o", help="Output format: 'list' (default), 'csv' (🐈-separated values), 'markdown', or 'json'")
@@ -536,10 +619,17 @@ if __name__ == "__main__":
             handler.setLevel(logging.WARNING)
 
         # Convert field arguments to a dictionary
-        field_values = {}
+        field_values: Dict[str, List[str]] = {}
         if args.field:
             for field_name, field_value in args.field:
-                field_values[field_name] = field_value
+                try:
+                    parsed_vals = parse_field_values(field_value)
+                except ValueError as e:
+                    logger.error(str(e))
+                    sys.exit(1)
+                # Always store a list of values (even if single) for uniform processing
+                field_values[field_name] = parsed_vals
+            logger.debug(f"Field filters: {field_values}")
 
         # Convert negative field arguments to a list of tuples
         negative_field_values = []
@@ -562,7 +652,8 @@ if __name__ == "__main__":
         subissue_details = []
         if args.subissues and issue_details:
             for i in issue_details:
-                subissue_details.extend(get_sub_issues(i.get('url'), parent_title=i.get('title')))
+                # URL key is guaranteed in issue_details construction; using direct index avoids Optional type
+                subissue_details.extend(get_sub_issues(i['url'], parent_title=i.get('title')))
                 logger.debug(f"Sub-issues for {i['url']}: {subissue_details}")
 
         if args.output == "json":
