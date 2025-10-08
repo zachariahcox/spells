@@ -85,9 +85,12 @@ def run_gh_command(cmd: List[str]) -> subprocess.CompletedProcess:
     return result
 
 
-def get_status(issue: Dict) -> str:
+def get_status(issue: Dict, comment_status) -> str:
     if issue.get("state", "").lower() == "closed":
         return "done" # apparently!
+
+    if comment_status:
+        return comment_status
 
     label_names = [label.get("name", "").lower() for label in issue.get("labels", [])]
     for s in STATUS_LABELS.keys():
@@ -214,7 +217,7 @@ def get_issue_details(
     detailed_issue["comment_url"] = comment_url if comment_url else "N/A"
     detailed_issue["parent_url"] = parent_url if parent_url else f"https://github.com/{repo}/issues/{issue_number}"
     detailed_issue["parent_title"] = parent_title if parent_title else f"{repo}#{issue_number}"
-    detailed_issue["status"] = comment_status or get_status(detailed_issue)
+    detailed_issue["status"] = get_status(detailed_issue, comment_status)
     return detailed_issue
 
 def get_sub_issues(
@@ -312,10 +315,11 @@ def render_markdown_report(
         status = issue.get("status", "inactive")
         status_priority = list(STATUS_LABELS.keys()).index(status) if status in STATUS_LABELS else 999
         target_date = issue.get("target_date", "9999-99-99")
-        if target_date == "N/A" or not target_date:
+        if target_date == "N/A":
             target_date = "9999-99-99"
+        last_update = issue.get("last_updated_at", "9999-99-99")
         title_inner = issue.get("title", "")
-        return (status_priority, target_date, title_inner)
+        return (status_priority, target_date, last_update, title_inner)
 
     for issue in sorted(filtered_issues, key=get_sort_key):
         url = issue.get("url", "")
