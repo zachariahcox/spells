@@ -71,6 +71,31 @@ STATUS_LABELS = {
     "inactive": "⚪",
 }
 
+STATUS_MAPPING = {
+    "🎉 Done": "done",
+    "🚧 Executing": "on track",
+    "🎯 Prioritized": "inactive",
+}
+
+def run_gh_command(cmd: List[str]) -> subprocess.CompletedProcess:
+    """Run a GitHub CLI command and return the completed process."""
+    logger.debug(f"Running command: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    logger.debug(f"Command completed with exit code: {result.returncode}")
+    return result
+
+
+def get_status(issue: Dict) -> str:
+    if issue.get("state", "").lower() == "closed":
+        return "done" # apparently!
+
+    label_names = [label.get("name", "").lower() for label in issue.get("labels", [])]
+    for s in STATUS_LABELS.keys():
+        if s in label_names:
+            return s
+
+    return "inactive"
+
 def log_json(data, message=None):
     """Helper function to log JSON data during debugging"""
     if logger.level <= logging.DEBUG:
@@ -91,71 +116,81 @@ def extract_repo_and_issue_number(issue_url: str) -> Tuple[str, str]:
         return repo, issue_number
     raise ValueError(f"Invalid GitHub issue URL: {issue_url}")
 
-def get_target_date_from_comments(
+def get_state_from_comments(
         repo: str,
         issue_number: str
-        ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
-    """Extract Target Date from issue comments, searching from newest to oldest.
+        ) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
+    """Extract state from issue comments, searching from newest to oldest.
 
     Returns:
-        A tuple (target_date, comment_created_at, comment_url) where:
+        A tuple (target_date, comment_created_at, comment_url, status) where:
         - target_date: The extracted target date or None if not found
         - comment_created_at: The timestamp of the comment containing the target date or None if not found
         - comment_url: The URL of the comment containing the target date or None if not found
     """
+    # Fetch comments for the issue using GitHub API
+    owner, repository = repo.split('/')
+    api_endpoint = f"/repos/{owner}/{repository}/issues/{issue_number}/comments"
+    cmd = [
+        "gh", "api",
+        "-H", "Accept: application/vnd.github+json",
+        "-H", "X-GitHub-Api-Version: 2022-11-28",
+        "--paginate",
+        f"{api_endpoint}?sort=created&direction=desc&per_page=100"
+    ]
+    result = run_gh_command(cmd)
+    # Paginated results might come as arrays on separate lines
     try:
-        # Fetch comments for the issue using GitHub API
-        owner, repository = repo.split('/')
-        api_endpoint = f"/repos/{owner}/{repository}/issues/{issue_number}/comments"
-        cmd = [
-            "gh", "api",
-            "-H", "Accept: application/vnd.github+json",
-            "-H", "X-GitHub-Api-Version: 2022-11-28",
-            "--paginate",
-            f"{api_endpoint}?sort=created&direction=desc&per_page=100"
-        ]
-        logger.debug(f"Running command: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        logger.debug(f"Command completed with exit code: {result.returncode}")
-        # Paginated results might come as arrays on separate lines
-        try:
-            content = result.stdout
-            if content.strip().startswith('[') and '\n[' in content:
-                all_comments = []
-                for line in content.splitlines():
-                    if line.strip():
-                        page_comments = json.loads(line)
-                        if isinstance(page_comments, list):
-                            all_comments.extend(page_comments)
-                comments = all_comments
-            else:
-                comments = json.loads(content)
-        except json.JSONDecodeError as e:
-            logger.error(f"Error parsing comments JSON: {e}")
-            comments = []
+        content = result.stdout
+        if content.strip().startswith('[') and '\n[' in content:
+            all_comments = []
+            for line in content.splitlines():
+                if line.strip():
+                    page_comments = json.loads(line)
+                    if isinstance(page_comments, list):
+                        all_comments.extend(page_comments)
+            comments = all_comments
+        else:
+            comments = json.loads(content)
+    except json.JSONDecodeError as e:
+        logger.error(f"Error parsing comments JSON: {e}")
+        comments = []
 
-        comments.sort(key=lambda x: x.get("created_at", ""), reverse=True)
-        target_date_pattern = r'<!-- data key="target_date" start -->\s*(.*?)\s*<!-- data end -->'
-        logger.debug(f"Searching for target date in {len(comments)} comments for {repo}#{issue_number}")
-        for comment in comments:
-            body = comment.get("body", "")
-            logger.debug(f"Checking comment from {comment.get('created_at', 'unknown date')}")
-            match = re.search(target_date_pattern, body, re.DOTALL)
-            if match:
-                target_date = match.group(1).strip()
-                comment_timestamp = comment.get("created_at")
-                comment_url = comment.get("html_url")
-                logger.debug(f"Found target date '{target_date}' in comment {comment_url}")
-                return target_date, comment_timestamp, comment_url
-        return None, None, None
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Error getting comments for {repo}#{issue_number}: {e}")
-        if hasattr(e, 'stderr'):
-            logger.error(f"stderr: {e.stderr}")
-        return None, None, None
-    except json.JSONDecodeError:
-        logger.error(f"Error decoding comments JSON for {repo}#{issue_number}")
-        return None, None, None
+    # prefer the most recent commits
+    comments.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    target_date_pattern = r'<!-- data key="target_date" start -->\s*(.*?)\s*<!-- data end -->'
+    target_date = None
+    comment_timestamp = None
+    comment_url = None
+
+    logger.debug(f"Searching for target date in {len(comments)} comments for {repo}#{issue_number}")
+    for comment in comments:
+        body = comment.get("body", "")
+        logger.debug(f"Checking comment from {comment.get('created_at', 'unknown date')}")
+        match = re.search(target_date_pattern, body, re.DOTALL)
+        if match:
+            target_date = match.group(1).strip()
+            comment_timestamp = comment.get("created_at")
+            comment_url = comment.get("html_url")
+            break
+
+    # check for status overrides
+    status_pattern = r'<!-- data key="status" start -->\s*(.*?)\s*<!-- data end -->'
+    status = None
+    for comment in comments:
+        body = comment.get("body", "")
+        match = re.search(status_pattern, body, re.DOTALL)
+        if match:
+            status = match.group(1).strip()
+            comment_timestamp = comment.get("created_at")
+            comment_url = comment.get("html_url")
+            break
+
+    # look up mapped comment status
+    if status:
+        status = STATUS_MAPPING.get(status)
+
+    return target_date, comment_timestamp, comment_url, status
 
 
 def get_issue_details(
@@ -169,17 +204,17 @@ def get_issue_details(
         return None
     logger.info(f"  - Found: https://github.com/{repo}/issues/{issue_number}")
     cmd = ["gh", "issue", "view", issue_number, "--repo", repo, "--json", "url,title,labels,number,state,closedAt"]
-    logger.debug(f"Running command: {' '.join(cmd)}")
-    sub_result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    logger.debug(f"Command completed with exit code: {sub_result.returncode}")
+    sub_result = run_gh_command(cmd)
+
     detailed_issue = json.loads(sub_result.stdout)
     log_json(detailed_issue, f"Detailed sub-issue data for {repo}#{issue_number}:")
-    target_date, comment_timestamp, comment_url = get_target_date_from_comments(repo, issue_number)
+    target_date, comment_timestamp, comment_url, comment_status = get_state_from_comments(repo, issue_number)
     detailed_issue["target_date"] = target_date if target_date else "N/A"
     detailed_issue["last_updated_at"] = comment_timestamp if comment_timestamp else "N/A"
     detailed_issue["comment_url"] = comment_url if comment_url else "N/A"
     detailed_issue["parent_url"] = parent_url if parent_url else f"https://github.com/{repo}/issues/{issue_number}"
     detailed_issue["parent_title"] = parent_title if parent_title else f"{repo}#{issue_number}"
+    detailed_issue["status"] = comment_status or get_status(detailed_issue)
     return detailed_issue
 
 def get_sub_issues(
@@ -189,37 +224,27 @@ def get_sub_issues(
         parent_title: Optional[str] = None
         ) -> List[Dict]:
     """Get sub-issues using the GitHub Sub-issues API via gh CLI."""
-    if not shutil.which("gh"):
-        raise RuntimeError("GitHub CLI (gh) not found. Please install it: https://cli.github.com/")
-    try:
-        owner, repository = parent_repo.split('/')
-        api_endpoint = f"/repos/{owner}/{repository}/issues/{parent_issue_number}/sub_issues"
-        cmd = [
-            "gh", "api",
-            "-H", "Accept: application/vnd.github+json",
-            "-H", "X-GitHub-Api-Version: 2022-11-28",
-            api_endpoint
-        ]
-        logger.debug(f"Running command: {' '.join(cmd)}")
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        logger.debug(f"Command completed with exit code: {result.returncode}")
-        sub_issues_data = json.loads(result.stdout)
-        log_json(sub_issues_data, f"Sub-issues data for {parent_repo}#{parent_issue_number}:")
-        sub_issues = []
-        for sub_issue in sub_issues_data:
-            sub_repo = sub_issue.get("repository", {}).get("full_name", "")
-            if not sub_repo and "repository_url" in sub_issue:
-                sub_repo = sub_issue.get("repository_url", "").replace("https://api.github.com/repos/", "")
-            sub_issue_number = str(sub_issue.get("number", ""))
-            detailed_sub_issue = get_issue_details(sub_repo, sub_issue_number, parent_url, parent_title)
-            if detailed_sub_issue:
-                sub_issues.append(detailed_sub_issue)
-        return sub_issues
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Error getting sub-issues for {parent_repo}#{parent_issue_number}: {e}")
-        if hasattr(e, 'stderr'):
-            logger.error(f"stderr: {e.stderr}")
-        return []
+    owner, repository = parent_repo.split('/')
+    api_endpoint = f"/repos/{owner}/{repository}/issues/{parent_issue_number}/sub_issues"
+    cmd = [
+        "gh", "api",
+        "-H", "Accept: application/vnd.github+json",
+        "-H", "X-GitHub-Api-Version: 2022-11-28",
+        api_endpoint
+    ]
+    result = run_gh_command(cmd)
+    sub_issues_data = json.loads(result.stdout)
+    log_json(sub_issues_data, f"Sub-issues data for {parent_repo}#{parent_issue_number}:")
+    sub_issues = []
+    for sub_issue in sub_issues_data:
+        sub_repo = sub_issue.get("repository", {}).get("full_name", "")
+        if not sub_repo and "repository_url" in sub_issue:
+            sub_repo = sub_issue.get("repository_url", "").replace("https://api.github.com/repos/", "")
+        sub_issue_number = str(sub_issue.get("number", ""))
+        detailed_sub_issue = get_issue_details(sub_repo, sub_issue_number, parent_url, parent_title)
+        if detailed_sub_issue:
+            sub_issues.append(detailed_sub_issue)
+    return sub_issues
 
 def format_timestamp_with_days_ago(
         timestamp: Optional[str],
@@ -337,41 +362,19 @@ def generate_report(
     parent_title = None
     parent_url = None
     for issue_url in issue_urls:
-        try:
-            logger.info(f"Processing {issue_url}...")
-            repo, issue_number = extract_repo_and_issue_number(issue_url)
-            parent_url = issue_url
-            parent_title = f"{repo}#{issue_number}"
-            try:
-                detailed_issue = get_issue_details(repo, issue_number)
-                if detailed_issue:
-                    root_issues.append(detailed_issue)
-                    parent_title = detailed_issue.get("title", parent_title)
-                    parent_url = detailed_issue.get("url", parent_url)
-            except Exception as e:  # noqa: BLE001
-                logger.warning(f"  Could not fetch details for {issue_url}: {e}")
-                continue
-            if show_subissues:
-                sub_issues = get_sub_issues(repo, issue_number, parent_url, parent_title)
-                all_sub_issues.extend(sub_issues)
-                logger.info(f"  Found {len(sub_issues)} sub-issues")
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"Error processing {issue_url}: {e}")
-            logger.debug(f"Exception type: {type(e).__name__}")
-            logger.debug(f"Exception args: {e.args}")
-            if isinstance(e, subprocess.CalledProcessError) and hasattr(e, 'stderr'):
-                logger.debug(f"stderr: {e.stderr}")
-            logger.debug(traceback.format_exc())
-
-    for issues in (root_issues, all_sub_issues):
-        for issue in issues:
-            status = "inactive"
-            label_names = [label.get("name", "").lower() for label in issue.get("labels", [])]
-            for sl in STATUS_LABELS.keys():
-                if sl in label_names:
-                    status = sl
-                    break
-            issue["status"] = status
+        logger.info(f"Processing {issue_url}...")
+        repo, issue_number = extract_repo_and_issue_number(issue_url)
+        parent_url = issue_url
+        parent_title = f"{repo}#{issue_number}"
+        detailed_issue = get_issue_details(repo, issue_number)
+        if detailed_issue:
+            root_issues.append(detailed_issue)
+            parent_title = detailed_issue.get("title", parent_title)
+            parent_url = detailed_issue.get("url", parent_url)
+        if show_subissues:
+            sub_issues = get_sub_issues(repo, issue_number, parent_url, parent_title)
+            all_sub_issues.extend(sub_issues)
+            logger.info(f"  Found {len(sub_issues)} sub-issues")
 
     custom_title = None
     if len(issue_urls) == 1:
