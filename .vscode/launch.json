@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "q2 test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/python/gh/report.py",
+            "console": "integratedTerminal",
+            "args": "--stdin < ~/reports/q2.txt"
+        },
+        {
             "name": "Launch file",
             "type": "go",
             "request": "launch",
@@ -18,6 +26,13 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
+                "https://github.com/orgs/github/projects/8681/views/29",
+                "--field",
+                "Org Team",
+                "\"Developer experiences\",\"Enterprise experiences\",\"Security experiences\",\"CSX - Team TBD\"",
+                "--field",
+                "Quarter",
+                "\"FY26-Q1 (CY25-Q3)\",\"FY26-Q2 (CY25-Q4)\""
             ]
         },
         {
@@ -36,7 +51,9 @@
             "type": "debugpy",
             "request": "launch",
             "module": "cli.main",
-            "args": ["test_name"]
+            "args": [
+                "test_name"
+            ]
         },
         {
             "name": "Debug migrate-branch-protections.py",
