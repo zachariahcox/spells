@@ -92,9 +92,10 @@ DEFAULT_PAGE_SIZE = 50  # Jira's default max is 100
 STATUS_CATEGORIES = {
     "done": "🟣",
     "in progress": "🟢",
+    "in review": "🟡",
+    "ready": "⚪",
     "to do": "⚪",
     "blocked": "🔴",
-    "in review": "🟡",
 }
 
 # Map common Jira status names to our categories
@@ -111,12 +112,18 @@ STATUS_MAPPING = {
     "developing": "in progress",
     "active": "in progress",
     "working": "in progress",
+    # Ready statuses (sorted before general To Do)
+    "ready for work": "ready",
+    "ready": "ready",
+    "ready for dev": "ready",
+    "ready for development": "ready",
+    "selected for development": "ready",
+    "prioritized": "ready",
     # To Do statuses
     "to do": "to do",
     "open": "to do",
     "new": "to do",
     "backlog": "to do",
-    "selected for development": "to do",
     # Blocked statuses
     "blocked": "blocked",
     "on hold": "blocked",
