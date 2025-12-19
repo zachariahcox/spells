@@ -91,52 +91,21 @@ DEFAULT_PAGE_SIZE = 50  # Jira's default max is 100
 # Status categories mapped to emojis
 STATUS_CATEGORIES = {
     "done": "🟣",
+    "resolved": "🟣",
     "in progress": "🟢",
-    "in review": "🟡",
-    "ready": "⚪",
-    "to do": "⚪",
+    "at risk": "🟡",
+    "off track": "🔴",
     "blocked": "🔴",
+    "not started": "⚪",
+    "ready for work": "⚪",
+    "vetting": "⚪",
+    "new": "⚪",
 }
 
-# Map common Jira status names to our categories
-STATUS_MAPPING = {
-    # Done statuses
-    "done": "done",
-    "closed": "done",
-    "resolved": "done",
-    "complete": "done",
-    "completed": "done",
-    # In Progress statuses
-    "in progress": "in progress",
-    "in development": "in progress",
-    "developing": "in progress",
-    "active": "in progress",
-    "working": "in progress",
-    # Ready statuses (sorted before general To Do)
-    "ready for work": "ready",
-    "ready": "ready",
-    "ready for dev": "ready",
-    "ready for development": "ready",
-    "selected for development": "ready",
-    "prioritized": "ready",
-    # To Do statuses
-    "to do": "to do",
-    "open": "to do",
-    "new": "to do",
-    "backlog": "to do",
-    # Blocked statuses
-    "blocked": "blocked",
-    "on hold": "blocked",
-    "waiting": "blocked",
-    "impediment": "blocked",
-    # Review statuses
-    "in review": "in review",
-    "code review": "in review",
-    "review": "in review",
-    "pending review": "in review",
-    "awaiting review": "in review",
+FIELDS = "summary,status,assignee,priority,created,updated,subtasks,issuelinks"
+CUSTOM_FIELDS: Dict[str, str] = {
+    'Target end': '',
 }
-
 
 class JiraClient:
     """Simple Jira REST API client using requests. Supports Cloud and Server/Data Center."""
@@ -187,9 +156,19 @@ class JiraClient:
     def get_issue(self, issue_key: str) -> Dict:
         """Get a single issue by key."""
         # Request specific fields to reduce response size
-        fields = "summary,status,assignee,priority,created,updated,duedate,resolutiondate,subtasks,issuelinks"
+        fields = "summary,status,assignee,priority,created,updated,,subtasks,issuelinks"
         return self.get(f"issue/{issue_key}", params={"fields": fields})
     
+    def load_custom_fields(self, field_names: Dict[str, str]):
+        """Load custom fields from Jira."""
+        fields = self.get("field")  # returns List[Dict]
+        for name in field_names.keys():
+            for f in fields:
+                if f.get("name") == name:
+                    id = f.get("id")
+                    field_names[name] = id
+                    break
+
     def search_issues(self, jql: str, fields: Optional[str] = None, max_results: int = 1000) -> List[Dict]:
         """
         Search for issues using JQL with proper pagination.
@@ -203,7 +182,14 @@ class JiraClient:
             List of issue dictionaries
         """
         if fields is None:
-            fields = "summary,status,assignee,priority,created,updated,duedate,resolutiondate"
+            fields = "summary,status,assignee,priority,created,updated"
+        
+        # look up fields by id
+        global CUSTOM_FIELDS
+        self.load_custom_fields(CUSTOM_FIELDS)
+        for id in CUSTOM_FIELDS.values():
+            if id:
+                fields += f",{id}"
         
         all_issues = []
         start_at = 0
@@ -308,15 +294,9 @@ def log_json(data, message=None):
             logger.debug(str(data))
 
 
-def normalize_status(status_name: str) -> str:
-    """Normalize a Jira status name to our standard categories."""
-    status_lower = status_name.lower().strip()
-    return STATUS_MAPPING.get(status_lower, "to do")
-
-
-def get_status_emoji(status_category: str) -> str:
+def get_status_emoji(status_name: str) -> str:
     """Get the emoji for a status category."""
-    return STATUS_CATEGORIES.get(status_category, "❓")
+    return STATUS_CATEGORIES.get(status_name, "❓")
 
 
 def parse_jira_date(date_str: Optional[str]) -> Optional[datetime.datetime]:
@@ -355,7 +335,7 @@ def extract_issue_data(issue: Dict, server_url: str, parent_key: Optional[str] =
     # Get status
     status_obj = fields.get("status", {})
     status_name = status_obj.get("name", "Unknown") if status_obj else "Unknown"
-    status_category = normalize_status(status_name)
+    # status_category = normalize_status(status_name)
     
     # Get assignee
     assignee_obj = fields.get("assignee")
@@ -368,8 +348,7 @@ def extract_issue_data(issue: Dict, server_url: str, parent_key: Optional[str] =
     # Get dates
     created = fields.get("created")
     updated = fields.get("updated")
-    due_date = fields.get("duedate")
-    resolution_date = fields.get("resolutiondate")
+    target_end = fields.get(CUSTOM_FIELDS['Target end'])
     
     # Get summary
     summary = fields.get("summary", "")
@@ -381,14 +360,12 @@ def extract_issue_data(issue: Dict, server_url: str, parent_key: Optional[str] =
         "key": issue_key,
         "url": issue_url,
         "summary": summary,
-        "status": status_category,
         "status_name": status_name,
         "assignee": assignee,
         "priority": priority,
         "created": created,
         "updated": updated,
-        "due_date": due_date,
-        "resolution_date": resolution_date,
+        "target_end": target_end,
         "parent_key": parent_key or issue_key,
         "parent_summary": parent_summary or summary,
         "parent_url": f"{server_url}/browse/{parent_key}" if parent_key else issue_url,
@@ -501,10 +478,10 @@ def render_markdown_report(
     result.append(f"\n### {title}, {datetime.datetime.now().strftime('%Y-%m-%d')}")
     
     if show_parent:
-        result.append("\n| status | parent | issue | assignee | due date | last update |")
+        result.append("\n| status | parent | issue | assignee | target date | last update |")
         result.append("|---|:--|:--|:--|:--|:--|")
     else:
-        result.append("\n| status | issue | assignee | due date | last update |")
+        result.append("\n| status | issue | assignee | target date | last update |")
         result.append("|---|:--|:--|:--|:--|")
     
     filtered_issues = []
@@ -530,14 +507,38 @@ def render_markdown_report(
         filtered_issues.append(issue)
 
     def get_sort_key(issue):
-        status = issue.get("status", "to do")
+        status = issue.get("status_name").lower().strip()
         status_priority = list(STATUS_CATEGORIES.keys()).index(status) if status in STATUS_CATEGORIES else 999
-        due_date = issue.get("due_date") or "9999-99-99"
-        if due_date == "None":
-            due_date = "9999-99-99"
+        target_end = issue.get(CUSTOM_FIELDS['Target end']) or "9999-99-99"
+        if target_end == "None":
+            target_end = "9999-99-99"
         last_update = issue.get("updated") or "9999-99-99"
         summary = issue.get("summary", "")
-        return (status_priority, due_date, last_update, summary)
+        return (status_priority, target_end, last_update, summary)
+
+    def is_overdue(issue: Dict) -> bool:
+        """Return True if current time is past the issue's due/target date (and it's not done)."""
+        if issue.get("status") == "done":
+            return False
+        target_end_str = issue.get(CUSTOM_FIELDS['Target end'])
+        if not target_end_str or target_end_str == "None":
+            return False
+        now = datetime.datetime.now(datetime.timezone.utc)
+        # Jira commonly returns due dates as date-only (YYYY-MM-DD). In that case, treat it as overdue
+        # only after the date has fully passed.
+        if isinstance(target_end_str, str) and "T" not in target_end_str:
+            try:
+                due_date = datetime.datetime.strptime(target_end_str, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                return False
+            return now.date() > due_date
+
+        due_dt = parse_jira_date(target_end_str)
+        if not due_dt:
+            return False
+        if due_dt.tzinfo is None:
+            due_dt = due_dt.replace(tzinfo=datetime.timezone.utc)
+        return now > due_dt
 
     for issue in sorted(filtered_issues, key=get_sort_key):
         url = issue.get("url", "")
@@ -545,26 +546,22 @@ def render_markdown_report(
         summary = issue.get("summary", "")
         issue_link = f"[{key}: {summary}]({url})"
         
-        status_category = issue.get("status", "to do")
-        status_name = issue.get("status_name", status_category)
-        emoji = get_status_emoji(status_category)
+        status_name = issue.get("status_name").lower().strip()
+        emoji = "🔴" if is_overdue(issue) else get_status_emoji(status_name)
         status_with_emoji = f"{emoji} {status_name}"
-        
+        target_end = format_date(issue.get("target_end"))
         assignee = issue.get("assignee", "Unassigned")
-        due_date = format_date(issue.get("due_date"))
-        
-        is_done = status_category == "done"
-        resolution_date = issue.get("resolution_date")
-        timestamp = resolution_date if (is_done and resolution_date) else issue.get("updated", "N/A")
-        formatted_timestamp_link = format_timestamp_with_link(timestamp, url, False)
+        is_done = status_name == "done"
+        updated = issue.get("updated")
+        formatted_timestamp_link = format_timestamp_with_link(updated, url, False)
         
         if show_parent:
             parent_url = issue.get("parent_url", "")
             parent_key = issue.get("parent_key", "")
             parent_link = f"[{parent_key}]({parent_url})"
-            row = f"| {status_with_emoji} | {parent_link} | {issue_link} | {assignee} | {due_date} | {formatted_timestamp_link} |"
+            row = f"| {status_with_emoji} | {parent_link} | {issue_link} | {assignee} | {target_end} | {formatted_timestamp_link} |"
         else:
-            row = f"| {status_with_emoji} | {issue_link} | {assignee} | {due_date} | {formatted_timestamp_link} |"
+            row = f"| {status_with_emoji} | {issue_link} | {assignee} | {target_end} | {formatted_timestamp_link} |"
         result.append(row)
     
     result.append("\n")
