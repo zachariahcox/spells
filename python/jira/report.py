@@ -509,7 +509,7 @@ def render_markdown_report(
     def get_sort_key(issue):
         status = issue.get("status_name").lower().strip()
         status_priority = list(STATUS_CATEGORIES.keys()).index(status) if status in STATUS_CATEGORIES else 999
-        target_end = issue.get(CUSTOM_FIELDS['Target end']) or "9999-99-99"
+        target_end = issue.get("target_end") or "9999-99-99"
         if target_end == "None":
             target_end = "9999-99-99"
         last_update = issue.get("updated") or "9999-99-99"
@@ -520,7 +520,7 @@ def render_markdown_report(
         """Return True if current time is past the issue's due/target date (and it's not done)."""
         if issue.get("status") == "done":
             return False
-        target_end_str = issue.get(CUSTOM_FIELDS['Target end'])
+        target_end_str = issue.get("target_end")
         if not target_end_str or target_end_str == "None":
             return False
         now = datetime.datetime.now(datetime.timezone.utc)
