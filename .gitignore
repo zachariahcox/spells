@@ -163,3 +163,4 @@ cython_debug/
 
 
 go/encrypt/emergency-kit/
+go/jira-report/build/
