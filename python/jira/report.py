@@ -67,7 +67,7 @@ import traceback
 import argparse
 import logging
 from typing import List, Dict, Optional
-from urllib.parse import urljoin, quote
+from urllib.parse import urljoin
 
 try:
     import requests
@@ -92,6 +92,7 @@ DEFAULT_PAGE_SIZE = 50  # Jira's default max is 100
 STATUS_CATEGORIES = {
     "done": "🟣",
     "resolved": "🟣",
+    "closed": "🟣",
     "in progress": "🟢",
     "at risk": "🟡",
     "off track": "🔴",
@@ -296,7 +297,7 @@ def log_json(data, message=None):
 
 def get_status_emoji(status_name: str) -> str:
     """Get the emoji for a status category."""
-    return STATUS_CATEGORIES.get(status_name, "❓")
+    return STATUS_CATEGORIES.get(status_name.lower(), "❓")
 
 
 def parse_jira_date(date_str: Optional[str]) -> Optional[datetime.datetime]:
@@ -518,7 +519,7 @@ def render_markdown_report(
 
     def is_overdue(issue: Dict) -> bool:
         """Return True if current time is past the issue's due/target date (and it's not done)."""
-        if issue.get("status") == "done":
+        if issue.get("status_name").lower().strip() in ("done", "closed", "resolved"):
             return False
         target_end_str = issue.get("target_end")
         if not target_end_str or target_end_str == "None":
