@@ -65,6 +65,7 @@ var statusCategories = map[string]string{
 // statusOrder defines the sort priority for statuses
 var statusOrder = []string{
 	"done",
+	"closed",
 	"resolved",
 	"in progress",
 	"at risk",
@@ -707,11 +708,21 @@ Examples:
 	// Generate report(s)
 	if *individual {
 		for _, issueKey := range issueKeys {
-			GenerateReport(client, []string{issueKey}, *includeParent, *includeSubtasks, *includeLinked,
-				since, *outputFile, "")
+			GenerateReport(client, []string{issueKey},
+				*includeParent,
+				*includeSubtasks,
+				*includeLinked,
+				since,
+				*outputFile,
+				"")
 		}
 	} else {
-		GenerateReport(client, issueKeys, *includeParent, *includeSubtasks, *includeLinked,
-			since, *outputFile, *jqlQuery)
+		GenerateReport(client, issueKeys,
+			*includeParent,
+			*includeSubtasks,
+			*includeLinked,
+			since,
+			*outputFile,
+			*jqlQuery)
 	}
 }
