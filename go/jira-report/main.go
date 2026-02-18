@@ -96,6 +96,8 @@ type IssueData struct {
 	ParentKey     string
 	ParentSummary string
 	ParentURL     string
+	Trending      string
+	Emoji         string
 }
 
 // ExtractIssueData extracts relevant data from a Jira issue API response
@@ -109,6 +111,7 @@ func ExtractIssueData(issue map[string]any, serverURL string, parentKey, parentS
 	if statusName == "" {
 		statusName = "Unknown"
 	}
+	statusName = strings.ToLower(strings.TrimSpace(statusName))
 
 	// Get assignee
 	assigneeObj := getMap(fields, "assignee")
@@ -140,6 +143,24 @@ func ExtractIssueData(issue map[string]any, serverURL string, parentKey, parentS
 	// Build issue URL
 	issueURL := fmt.Sprintf("%s/browse/%s", serverURL, issueKey)
 
+	// Get trending
+	trending := "on track"
+	switch statusName {
+	case "done", "closed", "resolved":
+		trending = "done"
+	case "not started", "ready for work", "vetting", "new":
+		trending = "not started"
+	default:
+		trending = statusName
+	}
+	emoji := GetStatusEmoji(statusName)
+
+	// override with due date info no matter what status
+	if IsOverdue(statusName, targetEnd) {
+		emoji = "🔴"
+		trending = "overdue"
+	}
+
 	// Handle parent info
 	if parentKey == "" {
 		parentKey = issueKey
@@ -165,6 +186,8 @@ func ExtractIssueData(issue map[string]any, serverURL string, parentKey, parentS
 		ParentKey:     parentKey,
 		ParentSummary: parentSummary,
 		ParentURL:     parentURL,
+		Trending:      trending,
+		Emoji:         emoji,
 	}
 }
 
@@ -321,11 +344,12 @@ func FormatTimestampWithLink(timestamp, issueURL string, includeDaysAgo bool) st
 		delta := now.Sub(tUTC)
 		daysAgo := int(delta.Hours() / 24)
 
-		if daysAgo == 0 {
+		switch daysAgo {
+		case 0:
 			daysText = " (today)"
-		} else if daysAgo == 1 {
+		case 1:
 			daysText = " (1 day ago)"
-		} else {
+		default:
 			daysText = fmt.Sprintf(" (%d days ago)", daysAgo)
 		}
 	}
@@ -334,28 +358,28 @@ func FormatTimestampWithLink(timestamp, issueURL string, includeDaysAgo bool) st
 }
 
 // IsOverdue returns true if the issue is past its target date and not done
-func IsOverdue(issue IssueData) bool {
-	status := strings.ToLower(strings.TrimSpace(issue.StatusName))
+func IsOverdue(statusName string, targetEnd string) bool {
+	status := strings.ToLower(strings.TrimSpace(statusName))
 	if status == "done" || status == "resolved" {
 		return false
 	}
 
-	if issue.TargetEnd == "" || issue.TargetEnd == "None" {
+	if targetEnd == "" || targetEnd == "None" {
 		return false
 	}
 
 	now := time.Now().UTC()
 
 	// Check if it's a date-only string (no 'T')
-	if !strings.Contains(issue.TargetEnd, "T") {
-		dueDate, err := time.Parse("2006-01-02", issue.TargetEnd)
+	if !strings.Contains(targetEnd, "T") {
+		dueDate, err := time.Parse("2006-01-02", targetEnd)
 		if err != nil {
 			return false
 		}
 		return now.Truncate(24 * time.Hour).After(dueDate)
 	}
 
-	dueTime, err := ParseJiraDate(issue.TargetEnd)
+	dueTime, err := ParseJiraDate(targetEnd)
 	if err != nil {
 		return false
 	}
@@ -446,15 +470,8 @@ func RenderMarkdownReport(issues []IssueData, showParent bool, since *time.Time,
 
 	// Render rows
 	for _, issue := range filteredIssues {
-		issueLink := fmt.Sprintf("[%s: %s](%s)", issue.Key, issue.Summary, issue.URL)
-
-		statusName := strings.ToLower(strings.TrimSpace(issue.StatusName))
-		emoji := GetStatusEmoji(statusName)
-		if IsOverdue(issue) {
-			emoji = "🔴"
-		}
-		statusWithEmoji := fmt.Sprintf("%s %s", emoji, statusName)
-
+		issueLink := fmt.Sprintf("[%s](%s)", issue.Summary, issue.URL)
+		statusWithEmoji := fmt.Sprintf("%s %s", issue.Emoji, issue.Trending)
 		targetEnd := FormatDate(issue.TargetEnd)
 		timestampLink := FormatTimestampWithLink(issue.Updated, issue.URL, false)
 
