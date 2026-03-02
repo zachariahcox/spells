@@ -72,6 +72,42 @@ class MyLinkedList(object):
                 
             node.next = node.next.next
 
+    def reverse_sublist(self, start_index, end_index):
+        """
+        :type start_index: int
+        :type end_index: int
+        :rtype: None
+        reverses the linked listed, starting from the node at the given start_index and ending at the node at the given end_index. 
+        """
+        if start_index > end_index or self.head is None:
+            return
+
+        # move to the start of the sublist
+        start = self.head
+        for _ in range(start_index):
+            if start is None:
+                return
+            start = start.next
+        
+        if start is None:
+            return
+
+        # reverse the sublist
+        prev = start
+        next = prev.next
+        for _ in range(end_index - start_index): # keep going until the end of the sublist
+            if next is None:
+                break
+            nn = next.next # copy original next pointer (can be None)
+            next.next = prev # reverse the link
+
+            # move to the next node in the sublist
+            prev = next 
+            next = nn 
+        
+        # connect the reversed sublist back to the main list
+        start.next = prev
+
 
 myLinkedList = MyLinkedList()
 myLinkedList.addAtHead(1)
