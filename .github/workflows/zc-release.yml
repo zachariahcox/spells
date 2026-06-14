@@ -41,9 +41,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ steps.get_version.outputs.tag }}"
-          
+
           echo "Checking if release $TAG already exists..."
-          
+
           if gh release view "$TAG" &> /dev/null; then
             echo "Release $TAG already exists. Exiting workflow successfully."
             echo "exists=true" >> $GITHUB_OUTPUT
@@ -69,8 +69,6 @@ jobs:
 
           cd go/encrypt
           RELEASE_VERSION="${VERSION}" make release-artifacts
-          cd ../..
-
           ls -la release/
 
           cat > release_notes.md << EOF
