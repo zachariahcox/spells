@@ -397,6 +397,11 @@ func cli(args []string) error {
 		if err := unzipFolder(zipFile, wd); err != nil {
 			return fmt.Errorf("error unzipping file: %v", err)
 		}
+		absOutput, err := filepath.Abs(output)
+		if err != nil {
+			return fmt.Errorf("error resolving output path: %v", err)
+		}
+		fmt.Printf("Decrypted folder written to %s\n", absOutput)
 	} else {
 		log.Println("Zipping folder...")
 		output := filename + ".enc"
@@ -408,6 +413,11 @@ func cli(args []string) error {
 		if err := encryptFile(zipFile, output, password); err != nil {
 			return fmt.Errorf("error encrypting file: %v", err)
 		}
+		absOutput, err := filepath.Abs(output)
+		if err != nil {
+			return fmt.Errorf("error resolving output path: %v", err)
+		}
+		fmt.Printf("Encrypted file written to %s\n", absOutput)
 	}
 	log.Println("Done!")
 	return nil
