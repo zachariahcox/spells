@@ -25,7 +25,7 @@ func TestCreateKit(t *testing.T) {
 		t.Fatal("README.md missing expected content")
 	}
 
-	for _, name := range []string{"decrypt.sh", "decrypt.command", "decrypt.bat"} {
+	for _, name := range []string{"decrypt-on-linux.sh", "decrypt-on-macos.command", "decrypt-on-windows.bat"} {
 		path := filepath.Join(outputDir, name)
 		info, err := os.Stat(path)
 		if err != nil {
@@ -36,12 +36,12 @@ func TestCreateKit(t *testing.T) {
 		}
 	}
 
-	shInfo, err := os.Stat(filepath.Join(outputDir, "decrypt.sh"))
+	shInfo, err := os.Stat(filepath.Join(outputDir, "decrypt-on-linux.sh"))
 	if err != nil {
-		t.Fatalf("stat decrypt.sh: %v", err)
+		t.Fatalf("stat decrypt-on-linux.sh: %v", err)
 	}
 	if shInfo.Mode()&0111 == 0 {
-		t.Fatal("decrypt.sh is not executable")
+		t.Fatal("decrypt-on-linux.sh is not executable")
 	}
 }
 
@@ -69,7 +69,7 @@ func TestKitOptionDefaultDir(t *testing.T) {
 	if err := cli([]string{"--new-kit"}); err != nil {
 		t.Fatalf("cli --new-kit: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(kitDir, "decrypt.sh")); err != nil {
-		t.Fatalf("default kit dir missing decrypt.sh: %v", err)
+	if _, err := os.Stat(filepath.Join(kitDir, "decrypt-on-linux.sh")); err != nil {
+		t.Fatalf("default kit dir missing decrypt-on-linux.sh: %v", err)
 	}
 }

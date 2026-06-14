@@ -17,9 +17,9 @@ The layout of your emergency kit probably looks like this:
 ├── your-encrypted-file.enc
 ├── emergency-kit/
 │   ├── README.md
-│   ├── decrypt.bat
-│   ├── decrypt.command
-│   ├── decrypt.sh
+│   ├── decrypt-on-windows.bat
+│   ├── decrypt-on-macos.command
+│   ├── decrypt-on-linux.sh
 │   ├── tools
 │   │   ├── linux
 │   │   │   └── amd64
@@ -38,11 +38,11 @@ The layout of your emergency kit probably looks like this:
 
 * Look for a file on your USB drive that ends with `.enc`.
 This is your encrypted file.
-* Look for those `decrypt` files next to this README -- you're about to click one of them!
+* Look for the `decrypt-on-*` files next to this README — use the one for your operating system.
 
 #### Windows Users
 
-1. Double-click the `decrypt.bat` file
+1. Double-click the `decrypt-on-windows.bat` file
 1. When prompted, either:
    - Type the full path to your encrypted file, or
    - Drag and drop your encrypted file into the command window
@@ -51,7 +51,7 @@ This is your encrypted file.
 
 #### macOS Users
 
-1. Double-click the `decrypt.command` file
+1. Double-click the `decrypt-on-macos.command` file
    - If you get a security warning, right-click the file, choose "Open", then click "Open" in the dialog
 1. When prompted, enter the path to your encrypted file
 1. Enter your password when prompted
@@ -59,7 +59,7 @@ This is your encrypted file.
 
 #### Linux Users
 
-1. Right-click on `decrypt.sh` and select "Run as Program" or "Execute"
+1. Right-click on `decrypt-on-linux.sh` and select "Run as Program" or "Execute"
 1. When prompted, enter the path to your encrypted file
 1. Enter your password when prompted
 1. Your files will be extracted to the same directory as the `.enc` file
@@ -87,7 +87,7 @@ If you're comfortable with the command line, you'll find the self-contained `zc`
 
 - **Linux Permission Error**: If you get "Permission denied":
   - Open a terminal
-  - Run `chmod +x /path/to/usb/emergency-kit/decrypt.sh`
+  - Run `chmod +x /path/to/usb/emergency-kit/decrypt-on-linux.sh`
 
 - **Output Directory Already Exists**: If you get an error about the output directory already existing:
   - Rename or move the existing directory before decrypting

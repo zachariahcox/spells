@@ -38,7 +38,7 @@ prepare-kit-embed: build-binaries
 	rm -rf kit
 	mkdir -p kit/tools
 	cp $(CURDIR)/README.md kit/
-	cp $(CURDIR)/scripts/decrypt.sh $(CURDIR)/scripts/decrypt.command $(CURDIR)/scripts/decrypt.bat kit/
+	cp $(CURDIR)/scripts/* kit/
 	cp -r $(BUILD_DIR)/* kit/tools/
 
 # Build all platform binaries with embedded kit, then extract the emergency kit.
