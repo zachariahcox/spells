@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -27,20 +28,42 @@ const scrypt_nonce_len = 12
 const scrypt_salt_len = 32
 const scrypt_key_len = 32 // aes-256bit has a 32byte derived key length
 
-func getPassword(prompt string) ([]byte, error) {
-	// this function is used to read a password from the terminal
-	// it uses the term package to read the password without echoing it
-	// it returns the password as a byte slice.
-	// this byte slice must be zeroed out after use!
-
+func readPassword(prompt string) ([]byte, error) {
 	fmt.Print(prompt)
 	pwd, err := term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println() // Add a newline after reading the password
+	fmt.Println()
 	return pwd, nil
 }
+
+func getPassword(confirm bool) ([]byte, error) {
+	for {
+		password, err := readPassword("Enter password: ")
+		if err != nil {
+			return nil, err
+		}
+		if !confirm {
+			return password, nil
+		}
+
+		again, err := readPassword("Confirm password: ")
+		if err != nil {
+			zeroBytes(password)
+			return nil, err
+		}
+		if !bytes.Equal(password, again) {
+			zeroBytes(password)
+			zeroBytes(again)
+			fmt.Println("Passwords do not match. Try again.")
+			continue
+		}
+		zeroBytes(again)
+		return password, nil
+	}
+}
+
 func zeroBytes(bytes []byte) {
 	for i := range bytes {
 		bytes[i] = 0
@@ -354,12 +377,13 @@ func cli(args []string) error {
 	if err != nil {
 		return fmt.Errorf("file does not exist: %s", filename)
 	}
-	if !fileInfo.IsDir() && !strings.HasSuffix(filename, ".enc") {
+	// make temp dir in the current directory to prevent leaks into the real temp dir
+	filename = filepath.Clean(filename) // make sure it doesn't end in a slash
+	isDecrypt := strings.HasSuffix(filename, tool_ext)
+	if !fileInfo.IsDir() && !isDecrypt {
 		return fmt.Errorf("file is not a directory, and doesn't have a '%s' extension: %s", filename, tool_ext)
 	}
 
-	// make temp dir in the current directory to prevent leaks into the real temp dir
-	filename = filepath.Clean(filename) // make sure it doesn't end in a slash
 	wd, err := filepath.Abs(filepath.Dir(filename))
 	if err != nil {
 		return fmt.Errorf("error getting current directory: %v", err)
@@ -371,14 +395,14 @@ func cli(args []string) error {
 	defer os.RemoveAll(temp) // clean up temp directory
 
 	// collect password
-	password, err := getPassword("Enter password: ")
+	password, err := getPassword(!isDecrypt)
 	if err != nil {
 		return fmt.Errorf("error reading password: %v", err)
 	}
 	defer zeroBytes(password)
 
 	// do the work
-	if strings.HasSuffix(filename, ".enc") {
+	if isDecrypt {
 		log.Println("Decrypting file...")
 		output := strings.TrimSuffix(filename, ".enc")
 
