@@ -52,6 +52,9 @@ func TestHelpOption(t *testing.T) {
 			if !strings.Contains(output, "Options:") || !strings.Contains(output, "Description:") {
 				t.Errorf("Help output missing expected sections")
 			}
+			if !strings.Contains(output, "--new-kit") {
+				t.Errorf("Help output missing --new-kit option")
+			}
 		})
 	}
 }

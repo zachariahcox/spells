@@ -308,11 +308,13 @@ func printHelp() {
 	fmt.Printf("Usage: %s [options] <folder name or file that ends in %s>\n\n", tool_name, tool_ext)
 	fmt.Printf("Options:\n")
 	fmt.Printf("  -h, --help     Show this help message and exit\n")
-	fmt.Printf("  -v, --version  Show version information and exit\n\n")
+	fmt.Printf("  -v, --version  Show version information and exit\n")
+	fmt.Printf("  --new-kit [dir]    Extract a portable emergency kit (default: %s)\n\n", defaultKitDir)
 	fmt.Printf("Description:\n")
 	fmt.Printf("  Provides compression of a folder, encryption and decryption.\n")
 	fmt.Printf("  - To encrypt a folder: %s <folder_name>\n", tool_name)
 	fmt.Printf("  - To decrypt a file: %s <filename%s>\n", tool_name, tool_ext)
+	fmt.Printf("  - To create a new emergency kit: %s --new-kit <output_directory>\n", tool_name)
 }
 
 func printVersion() {
@@ -335,6 +337,10 @@ func cli(args []string) error {
 	if args[0] == "-v" || args[0] == "--version" {
 		printVersion()
 		return nil
+	}
+
+	if args[0] == "--new-kit" {
+		return runKitCommand(args[1:])
 	}
 
 	// check for arguments

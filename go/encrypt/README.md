@@ -7,7 +7,7 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 - Encrypts directories by first zipping them, then applying AES-256 encryption
 - Decrypts and extracts previously encrypted files and directories
 - Uses secure password-based encryption with scrypt for key derivation
-- Requires no other dependencies or tools. 
+- Requires no other dependencies or tools.
 
 ### Using the Emergency Kit
 
@@ -193,18 +193,8 @@ make uninstall
 
 You can create a portable emergency kit on a USB drive that includes both your encrypted data and the tools to decrypt it on any computer.
 
-Use the provided `kit` make target to generate the correct layout:
-
 ```bash
-make kit
-```
-
-This will:
-
-1. Build all binaries for all supported platforms
-2. Create a `emergency-kit` directory with the full emergency kit structure
-3. Copy all necessary files to the correct locations
-4. Set appropriate permissions for executable files
-5. Create a user-friendly README file
-
-After running this command, copy the contents of the directory to your USB drive next to your encrypted files.
+zc --new-kit /path/to/usb/drive # this will create an emergency kit in the USB drive (it will not overwrite the existing files)
+zc /path/to/folder # this will create folder.enc in the current directory
+cp folder.enc /path/to/usb/drive # copy the encrypted file to the USB drive
+``
