@@ -196,11 +196,13 @@ func zipFolder(folder string, zipFileName string) error {
 			return err
 		}
 
-		// Set the header name to the relative path
-		header.Name, err = filepath.Rel(filepath.Dir(folder), path)
+		// Set the header name to the relative path using zip's forward-slash convention
+		rel, err := filepath.Rel(filepath.Dir(folder), path)
 		if err != nil {
 			return err
 		}
+		// converts a relative filesystem path to the forward-slash form required by the zip format, regardless of the host OS.
+		header.Name = filepath.ToSlash(rel)
 
 		// If the file is a directory, add a trailing slash to the header name
 		if info.IsDir() {
@@ -261,7 +263,6 @@ func unzipFolder(zipFileName, folder string) error {
 	// Extract files from the zip file into the specified folder
 	for _, zf := range zipReader.File {
 		// Convert the zip entry name to a platform-specific path by splitting on '/' and rejoining
-		// This handles the case where zip files always use '/' as separator regardless of platform
 		entryParts := strings.Split(zf.Name, "/")
 		cleanedEntryPath := filepath.Join(entryParts...)
 		path := filepath.Join(folder, cleanedEntryPath)

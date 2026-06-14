@@ -26,8 +26,3 @@ echo.
 
 set ZC=%~dp0tools\windows\amd64\zc.exe
 "%ZC%" "%FILE_TO_DECRYPT%"
-
-echo.
-echo If the decryption was successful, your files have been extracted.
-echo Press any key to exit.
-pause >nul

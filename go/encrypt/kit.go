@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -17,9 +18,12 @@ func getWorkingDirectory() (string, error) {
 		return wd, nil
 	}
 
-	// When the cwd inode was removed, getwd can fail even though /proc/self/cwd still works.
-	if wd, err := os.Readlink("/proc/self/cwd"); err == nil {
-		return wd, nil
+	// Linux-only fallback: getwd can fail if the cwd inode was removed while
+	// /proc/self/cwd still points at the path (common after deleting the cwd).
+	if runtime.GOOS == "linux" {
+		if wd, err := os.Readlink("/proc/self/cwd"); err == nil {
+			return wd, nil
+		}
 	}
 
 	return "", fmt.Errorf("cannot determine current directory: %w (pass an absolute output path)", err)
@@ -54,7 +58,101 @@ func createKit(absOutputDir string) error {
 	return nil
 }
 
+// pathWithinRoot reports whether path stays inside root after cleaning.
+// embed.FS rejects ".." today, but this mirrors unzipFolder and blocks escapes
+// if the embedded tree or build pipeline is ever compromised.
+func pathWithinRoot(root, path string) bool {
+	cleanRoot := filepath.Clean(root)
+	cleanPath := filepath.Clean(path)
+	if cleanPath == cleanRoot {
+		return true
+	}
+	return strings.HasPrefix(cleanPath, cleanRoot+string(os.PathSeparator))
+}
+
+// ensureOutputRoot verifies the kit destination is a real directory.
+// A symlinked output root (e.g. USB mount -> $HOME) would otherwise let
+// kit extraction write anywhere that link targets.
+func ensureOutputRoot(outputRoot string) error {
+	info, err := os.Lstat(outputRoot)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return os.Mkdir(outputRoot, 0755)
+		}
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("refusing to write kit through symlinked output directory: %s", outputRoot)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("kit output path is not a directory: %s", outputRoot)
+	}
+	return nil
+}
+
+// safeMkdirAll creates directories under outputRoot without following symlinks.
+// os.MkdirAll follows symlinks, so a malicious USB layout like
+// tools/linux -> /tmp/escape could redirect writes outside the kit folder.
+func safeMkdirAll(outputRoot, dir string) error {
+	dir = filepath.Clean(dir)
+	if !pathWithinRoot(outputRoot, dir) {
+		return fmt.Errorf("%s is outside %s", dir, outputRoot)
+	}
+	if dir == outputRoot {
+		return ensureOutputRoot(outputRoot)
+	}
+
+	rel, err := filepath.Rel(outputRoot, dir)
+	if err != nil {
+		return err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return fmt.Errorf("%s is outside %s", dir, outputRoot)
+	}
+
+	current := outputRoot
+	for _, part := range strings.Split(filepath.ToSlash(rel), "/") {
+		if part == "" || part == "." {
+			continue
+		}
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			if os.IsNotExist(err) {
+				if err := os.Mkdir(current, 0755); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("refusing to follow symlink: %s", current)
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("path component is not a directory: %s", current)
+		}
+	}
+	return nil
+}
+
+func safeWriteFile(outputRoot, dest string, data []byte, perm os.FileMode) error {
+	dest = filepath.Clean(dest)
+	if !pathWithinRoot(outputRoot, dest) {
+		return fmt.Errorf("%s is outside %s", dest, outputRoot)
+	}
+	if err := safeMkdirAll(outputRoot, filepath.Dir(dest)); err != nil {
+		return err
+	}
+	return writeFileNoSymlink(dest, data, perm)
+}
+
 func extractEmbeddedDir(efs embed.FS, embedRoot, outputRoot string) error {
+	outputRoot = filepath.Clean(outputRoot)
+	if err := ensureOutputRoot(outputRoot); err != nil {
+		return err
+	}
+
 	return fs.WalkDir(efs, embedRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -68,14 +166,17 @@ func extractEmbeddedDir(efs embed.FS, embedRoot, outputRoot string) error {
 			return err
 		}
 		rel = filepath.FromSlash(rel)
-
-		dest := filepath.Join(outputRoot, rel)
-		if d.IsDir() {
-			return os.MkdirAll(dest, 0755)
+		if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid embedded path: %s", rel)
 		}
 
-		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-			return err
+		dest := filepath.Clean(filepath.Join(outputRoot, rel))
+		if !pathWithinRoot(outputRoot, dest) {
+			return fmt.Errorf("%s is outside %s", dest, outputRoot)
+		}
+
+		if d.IsDir() {
+			return safeMkdirAll(outputRoot, dest)
 		}
 
 		data, err := efs.ReadFile(path)
@@ -83,10 +184,7 @@ func extractEmbeddedDir(efs embed.FS, embedRoot, outputRoot string) error {
 			return err
 		}
 
-		if err := os.WriteFile(dest, data, embeddedFileMode(rel)); err != nil {
-			return err
-		}
-		return nil
+		return safeWriteFile(outputRoot, dest, data, embeddedFileMode(rel))
 	})
 }
 

@@ -1,5 +1,4 @@
-#!/bin/env bash
-
+#!/usr/bin/env bash
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ARCH=$([[ $(uname -m) == "aarch64" ]] && echo arm64 || echo amd64)
 ZC="$DIR/tools/linux/$ARCH/zc"
@@ -28,8 +27,3 @@ echo "Starting decryption process..."
 echo
 chmod +x "$ZC"
 "$ZC" "$FILE_TO_DECRYPT"
-
-echo
-echo "If the decryption was successful, your files have been extracted."
-echo "Press Enter to exit."
-read

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"fmt"
 	"io"
@@ -150,6 +151,33 @@ func TestZip(t *testing.T) {
 	// Verify the contents of the unzipped folder
 	if err := verifyFolderContents(testFolder, unzipFolderName+"/"+testFolder); err != nil {
 		t.Fatalf("%v", err)
+	}
+}
+
+func TestZipFolderUsesForwardSlashes(t *testing.T) {
+	testFolder := filepath.Join(t.TempDir(), "test_folder")
+	if err := os.MkdirAll(filepath.Join(testFolder, "sub"), 0755); err != nil {
+		t.Fatalf("error creating test folder: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(testFolder, "sub", "file.txt"), []byte("nested"), 0644); err != nil {
+		t.Fatalf("error creating test file: %v", err)
+	}
+
+	zipFileName := filepath.Join(t.TempDir(), "test.zip")
+	if err := zipFolder(testFolder, zipFileName); err != nil {
+		t.Fatalf("error zipping folder: %v", err)
+	}
+
+	reader, err := zip.OpenReader(zipFileName)
+	if err != nil {
+		t.Fatalf("error opening zip file: %v", err)
+	}
+	defer reader.Close()
+
+	for _, entry := range reader.File {
+		if strings.Contains(entry.Name, `\`) {
+			t.Errorf("zip entry %q contains backslash; zip paths must use forward slashes", entry.Name)
+		}
 	}
 }
 

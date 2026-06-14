@@ -1,5 +1,7 @@
 # zc - a stand-alone zip and encrypt tool
 
+## TL;DR: double-click the `decrypt-on-*` file for your operating system and follow the instructions.
+
 ## Overview
 
 ZC (short for "Zip and Crypt") is a Go utility that:
@@ -14,8 +16,8 @@ ZC (short for "Zip and Crypt") is a Go utility that:
 The layout of your emergency kit probably looks like this:
 
 ```bash
-├── your-encrypted-file.enc
 ├── emergency-kit/
+├── your-encrypted-file.enc
 │   ├── README.md
 │   ├── decrypt-on-windows.bat
 │   ├── decrypt-on-macos.command
@@ -196,5 +198,5 @@ You can create a portable emergency kit on a USB drive that includes both your e
 ```bash
 zc --new-kit /path/to/usb/drive # this will create an emergency kit in the USB drive (it will not overwrite the existing files)
 zc /path/to/folder # this will create folder.enc in the current directory
-cp folder.enc /path/to/usb/drive # copy the encrypted file to the USB drive
+cp folder.enc /path/to/usb/drive # copy the encrypted file into the kit
 ``
