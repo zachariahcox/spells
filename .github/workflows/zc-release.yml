@@ -66,10 +66,13 @@ jobs:
         run: |
           VERSION="${{ steps.get_version.outputs.version }}"
           TAG="${{ steps.get_version.outputs.tag }}"
+          RELEASE_DIR="go/encrypt/release"
 
           cd go/encrypt
           RELEASE_VERSION="${VERSION}" make release-artifacts
-          ls -la release/
+          cd ../..
+
+          ls -la "${RELEASE_DIR}/"
 
           cat > release_notes.md << EOF
           Pre-built \`zc\` binaries for encrypting folders and files.
@@ -88,10 +91,12 @@ jobs:
           gh release create "$TAG" \
             --title "zc $TAG" \
             --notes-file release_notes.md \
-            release/*
+            "${RELEASE_DIR}"/*
+
+          echo "subject_path=${RELEASE_DIR}/*" >> "$GITHUB_OUTPUT"
 
       - name: Attest
         if: steps.check_release.outputs.exists != 'true'
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: release/*
+          subject-path: ${{ steps.create_artifact.outputs.subject_path }}
