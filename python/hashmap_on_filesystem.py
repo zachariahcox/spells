@@ -5,15 +5,15 @@ import os
 import shutil
 
 class FileSystemSet():
-    data_directory_name = "FileSystemSetData"
-    data_directory = data_directory_name
-    max_files_per_directory = 1
-    max_collisions_per_file = 1
+    name = "FileSystemSetData" # name of the set
+    data_directory = name
+    max_files_per_directory = 1 # avoid scale problems with too many files in a directory
+    max_collisions_per_file = 1 # avoid scale problems with too many collisions in a file
     tri_length = 0 # how long should directory path components be?
     folder_depth = 1 # how many path components to use from the hash
 
     def __init__(self, directory):
-        self.data_directory_name = directory
+        self.name = directory
         self.data_directory = self.new_directory_name()
 
     def __del__(self):
@@ -86,7 +86,7 @@ class FileSystemSet():
 
     def new_directory_name(self):
         return "_".join([
-            self.data_directory_name,
+            self.name,
             str(self.tri_length),
             str(self.folder_depth)
             ])
@@ -99,8 +99,8 @@ class FileSystemSet():
         directory = os.path.join(root, *sub_dirs)
         return directory
 
-    def file_hash(self, line):
-        return str(abs(hash(line)))
+    def file_hash(self, key):
+        return str(abs(hash(key)))
 
     def rebalance(self):
         """
@@ -114,7 +114,6 @@ class FileSystemSet():
 
         # change hash function?
         changed_hash_function = False
-
 
         # new root directory
         old_data_directory = self.data_directory
