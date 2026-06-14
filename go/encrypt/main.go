@@ -19,7 +19,8 @@ import (
 // config for scrypt
 const tool_name = "zc"
 const tool_ext = ".enc"
-const tool_version = "1.0.0"
+
+var tool_version = "dev" // overridden at link time via -ldflags from the git tag
 const scrypt_N = 1048576 // 2**20
 const scrypt_r = 8
 const scrypt_p = 1

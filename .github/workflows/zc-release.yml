@@ -1,8 +1,10 @@
 name: release zc folder encryption kit
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
-    # This allows manual triggering of the workflow
 
 permissions:
   contents: write  # Needed for creating releases
@@ -17,73 +19,81 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Extract version
         id: get_version
         run: |
-          cd go/encrypt
-          VERSION=$(grep "const tool_version" main.go | cut -d'"' -f2)
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="$(git describe --tags --abbrev=0)"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version extracted: ${VERSION}"
-          cd ../..
+          echo "Release tag: ${TAG} (version ${VERSION})"
 
       - name: Check if release already exists
         id: check_release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          TAG_VERSION="v${VERSION}"
+          TAG="${{ steps.get_version.outputs.tag }}"
           
-          echo "Checking if tag $TAG_VERSION already exists..."
+          echo "Checking if release $TAG already exists..."
           
-          # Use the GitHub CLI to check if the release exists
-          if gh release view "$TAG_VERSION" &> /dev/null; then
-            echo "Release $TAG_VERSION already exists. Exiting workflow successfully."
+          if gh release view "$TAG" &> /dev/null; then
+            echo "Release $TAG already exists. Exiting workflow successfully."
             echo "exists=true" >> $GITHUB_OUTPUT
             exit 0
           else
-            echo "Release $TAG_VERSION does not exist. Continuing with build."
+            echo "Release $TAG does not exist. Continuing with build."
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.18'  # Ensure we're using a compatible version
+          go-version-file: go/encrypt/go.mod
 
-      - name: Build zip and push release
+      - name: Build and push release
         id: create_artifact
         if: steps.check_release.outputs.exists != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd go/encrypt
-          make kit
-          cd emergency-kit
           VERSION="${{ steps.get_version.outputs.version }}"
-          ARTIFACT_NAME="zc-${VERSION}.zip"
-          zip -r "../../../${ARTIFACT_NAME}" ./*
-          cd ../../..
-          echo "Created ZIP archive: ${ARTIFACT_NAME}"
+          TAG="${{ steps.get_version.outputs.tag }}"
 
-          # Create release notes
+          cd go/encrypt
+          RELEASE_VERSION="${VERSION}" make release-artifacts
+          cd ../..
+
+          ls -la release/
+
           cat > release_notes.md << EOF
-          This is a pre-built emergency-kit based on zc, a self-contained tool for encrypting folders and files.
-          For full instructions, see the README.md file included in the package.
-          EOF
-          
-          ls -la
+          Pre-built \`zc\` binaries for encrypting folders and files.
 
-          # Create the release with GitHub CLI
-          TAG_VERSION="v${VERSION}"
-          gh release create "$TAG_VERSION" \
-            --title "zc folder encryption kit $TAG_VERSION" \
+          | File | Platform |
+          | --- | --- |
+          | \`zc-${VERSION}-linux-amd64\` | Linux x86_64 |
+          | \`zc-${VERSION}-linux-arm64\` | Linux ARM64 |
+          | \`zc-${VERSION}-windows-amd64.exe\` | Windows x86_64 |
+          | \`zc-${VERSION}-darwin-amd64\` | macOS x86_64 |
+          | \`zc-${VERSION}-darwin-arm64\` | macOS Apple Silicon |
+
+          For full instructions, see the README in the repository.
+          EOF
+
+          gh release create "$TAG" \
+            --title "zc $TAG" \
             --notes-file release_notes.md \
-            "${ARTIFACT_NAME}"
-          echo "artifact_name=${ARTIFACT_NAME}" >> $GITHUB_OUTPUT
-  
+            release/*
+
       - name: Attest
+        if: steps.check_release.outputs.exists != 'true'
         uses: actions/attest-build-provenance@v2
         with:
-          subject-path: '${{ steps.create_artifact.outputs.artifact_name }}'
+          subject-path: release/*
