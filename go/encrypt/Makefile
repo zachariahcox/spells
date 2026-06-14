@@ -35,10 +35,11 @@ test:
 
 # build and install the binary
 install:
-	mkdir -p $(INSTALL_DIR)/bin
+	@mkdir -p $(INSTALL_DIR)/bin
 	@os_arch=$$(go env GOOS)/$$(go env GOARCH); \
 		bin_suffix=$$(if [ "$$(go env GOOS)" = "windows" ]; then echo ".exe"; else echo ""; fi); \
 		cp $(BUILD_DIR)/$$os_arch/$(BINARY_NAME)$$bin_suffix $(INSTALL_DIR)/bin/$(BINARY_NAME)$$bin_suffix
+	@echo "Installed $(BINARY_NAME) to $(INSTALL_DIR)/bin"
 
 # uninstall the binary
 uninstall:
